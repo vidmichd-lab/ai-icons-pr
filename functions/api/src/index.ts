@@ -123,6 +123,12 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
 }
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
+  Expires: '0',
+}
+
 const getEnv = () =>
   envSchema.parse({
     KREA_API_TOKEN: process.env.KREA_API_TOKEN,
@@ -152,6 +158,7 @@ const response = (statusCode: number, body: unknown) => ({
   statusCode,
   headers: {
     ...corsHeaders,
+    ...noStoreHeaders,
     'Content-Type': 'application/json',
   },
   body: JSON.stringify(body),
@@ -168,6 +175,7 @@ const binaryResponse = (
   statusCode,
   headers: {
     ...corsHeaders,
+    ...noStoreHeaders,
     'Content-Type': options.contentType,
     ...(options.fileName
       ? {
@@ -423,7 +431,10 @@ export const handler = async (event: HttpEvent) => {
     if (event.httpMethod === 'OPTIONS') {
       return {
         statusCode: 204,
-        headers: corsHeaders,
+        headers: {
+          ...corsHeaders,
+          ...noStoreHeaders,
+        },
         body: '',
       }
     }

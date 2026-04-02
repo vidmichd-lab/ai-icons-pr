@@ -48,7 +48,9 @@ export const api = {
 
   async getStyles() {
     return ensureOk<{ styles: StylePreset[] }>(
-      await fetch(`${API_BASE_URL}/styles`),
+      await fetch(`${API_BASE_URL}/styles`, {
+        cache: 'no-store',
+      }),
     )
   },
 
