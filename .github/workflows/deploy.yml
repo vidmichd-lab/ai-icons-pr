@@ -99,4 +99,7 @@ jobs:
         run: |
           aws s3 sync dist "s3://$YC_BUCKET_NAME" \
             --endpoint-url https://storage.yandexcloud.net \
+            --exclude "auth/*" \
+            --exclude "config/*" \
+            --exclude "style-previews/*" \
             --delete
