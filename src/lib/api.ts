@@ -2,6 +2,7 @@ import type {
   AuthUser,
   EditableStylePayload,
   GenerationStatus,
+  ManagedUser,
   StylePreset,
 } from '../types'
 
@@ -16,6 +17,11 @@ type GenerationRequest = {
 type LoginPayload = {
   login: string
   password: string
+}
+
+type AdminCreateUserPayload = {
+  login: string
+  name: string
 }
 
 export class ApiError extends Error {
@@ -145,7 +151,7 @@ export const api = {
   },
 
   async createGeneration(payload: GenerationRequest) {
-    return ensureOk<{ jobId: string; status: GenerationStatus }>(
+    return ensureOk<{ jobId: string; status: GenerationStatus; quota: AuthUser['quota'] }>(
       await fetchApi('/generations', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -159,5 +165,18 @@ export const api = {
       resultUrl?: string
       error?: string
     }>(await fetchApi(`/jobs/${jobId}`))
+  },
+
+  async getAdminUsers() {
+    return ensureOk<{ users: ManagedUser[] }>(await fetchApi('/admin/users', { cache: 'no-store' }))
+  },
+
+  async createAdminUser(payload: AdminCreateUserPayload) {
+    return ensureOk<{ user: ManagedUser; password: string }>(
+      await fetchApi('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    )
   },
 }

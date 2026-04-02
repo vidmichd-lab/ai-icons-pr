@@ -18,11 +18,30 @@ export type EditableStylePayload = {
 
 export type AuthRole = 'admin' | 'manager'
 
+export type GenerationQuota = {
+  limit: number
+  used: number
+  remaining: number
+  period: string
+}
+
 export type AuthUser = {
   id: string
   login: string
   name: string
   role: AuthRole
+  quota: GenerationQuota
+}
+
+export type ManagedUser = {
+  id: string
+  login: string
+  name: string
+  role: AuthRole
+  disabled: boolean
+  createdAt: string
+  updatedAt: string
+  quota: GenerationQuota
 }
 
 export type GenerationStatus =

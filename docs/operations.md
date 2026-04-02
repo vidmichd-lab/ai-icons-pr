@@ -11,7 +11,11 @@
 ## Управление доступом
 
 - bootstrap admin создается автоматически при первом логине из `AUTH_BOOTSTRAP_LOGIN` и `AUTH_BOOTSTRAP_PASSWORD`
-- менеджеров можно добавлять локально через [scripts/auth-users.mjs](/Users/vidmich/Downloads/icons/repo/scripts/auth-users.mjs)
+- основной root-admin интерфейса: `vidmich`
+- только `vidmich` видит `Панель управления` и controls для CRUD по стилям
+- менеджеров можно добавлять из UI через `Панель управления` или локально через [scripts/auth-users.mjs](/Users/vidmich/Downloads/icons/repo/scripts/auth-users.mjs)
+- каждому пользователю доступно 100 генераций на календарный месяц по UTC-месяцу
+- счетчик списывается на каждый `POST /generations`, независимо от скачивания результата
 
 Примеры:
 

@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { DownloadIcon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
+import {
+  CopyIcon,
+  DownloadIcon,
+  LoaderCircleIcon,
+  PlusIcon,
+  RefreshCcwIcon,
+  Settings2Icon,
+  Trash2Icon,
+} from 'lucide-react'
 import { zipSync } from 'fflate'
 
 import { Button } from '@/components/ui/button'
@@ -32,6 +40,7 @@ import type {
   EditableStylePayload,
   GeneratedAsset,
   HistorySession,
+  ManagedUser,
   SourceUpload,
   StylePreset,
 } from '@/types'
@@ -98,6 +107,14 @@ function App() {
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
   const [previewAsset, setPreviewAsset] = useState<{ url: string; label: string } | null>(null)
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([])
+  const [generatedCredentials, setGeneratedCredentials] = useState<{ login: string; password: string } | null>(null)
+  const [isAdminLoading, setIsAdminLoading] = useState(false)
+  const [isAdminBusy, startAdminMutation] = useTransition()
+
+  const isRootAdmin = authUser?.login === 'vidmich'
+  const quotaLabel = authUser ? `${authUser.quota.remaining}/${authUser.quota.limit}` : null
 
   const loadStyles = async () => {
     setIsStylesLoading(true)
@@ -119,6 +136,35 @@ function App() {
     }
   }
 
+  const refreshAuthUser = async () => {
+    try {
+      const response = await api.getMe()
+      setAuthUser(response.user)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthUser(null)
+      }
+    }
+  }
+
+  const loadAdminUsers = useCallback(async () => {
+    if (!isRootAdmin) {
+      return
+    }
+
+    setIsAdminLoading(true)
+
+    try {
+      const response = await api.getAdminUsers()
+      setManagedUsers(response.users)
+      setNotice('')
+    } catch (error) {
+      setNotice(ensureErrorMessage(error))
+    } finally {
+      setIsAdminLoading(false)
+    }
+  }, [isRootAdmin])
+
   useEffect(() => {
     void api
       .getMe()
@@ -139,6 +185,12 @@ function App() {
   useEffect(() => {
     saveHistory(history)
   }, [history])
+
+  useEffect(() => {
+    if (isAdminPanelOpen && isRootAdmin) {
+      void loadAdminUsers()
+    }
+  }, [isAdminPanelOpen, isRootAdmin, loadAdminUsers])
 
   const selectedStyle = useMemo(
     () => styles.find((style) => style.id === selectedStyleId) ?? null,
@@ -219,6 +271,9 @@ function App() {
         setStyles([])
         setSelectedStyleId('')
         setPassword('')
+        setManagedUsers([])
+        setGeneratedCredentials(null)
+        setIsAdminPanelOpen(false)
         setNotice('')
       })
   }
@@ -275,6 +330,15 @@ function App() {
             seed,
           })
 
+          setAuthUser((current) =>
+            current
+              ? {
+                  ...current,
+                  quota: generation.quota,
+                }
+              : current,
+          )
+
           setHistory((current) =>
             updateSession(current, sessionId, (session) => ({
               ...session,
@@ -293,6 +357,10 @@ function App() {
 
           void pollJob(sessionId, generationId, generation.jobId)
         } catch (error) {
+          if (error instanceof ApiError && error.status === 429) {
+            await refreshAuthUser()
+          }
+
           setHistory((current) =>
             updateSession(current, sessionId, (session) =>
               patchGeneration(session, generationId, (generation) => ({
@@ -405,6 +473,15 @@ function App() {
           seed,
         })
 
+        setAuthUser((current) =>
+          current
+            ? {
+                ...current,
+                quota: response.quota,
+              }
+            : current,
+        )
+
         setHistory((current) =>
           updateSession(current, session.id, (item) =>
             patchGeneration(item, generationId, (generation) => ({
@@ -417,6 +494,10 @@ function App() {
 
         void pollJob(session.id, generationId, response.jobId)
       } catch (error) {
+        if (error instanceof ApiError && error.status === 429) {
+          await refreshAuthUser()
+        }
+
         setHistory((current) =>
           updateSession(current, session.id, (item) =>
             patchGeneration(item, generationId, (generation) => ({
@@ -431,6 +512,10 @@ function App() {
   }
 
   const openStyleCreator = (style?: StylePreset) => {
+    if (!isRootAdmin) {
+      return
+    }
+
     if (!isStylesUnlocked) {
       setPendingStyleAction(style ?? 'new')
       setIsPasswordDialogOpen(true)
@@ -476,6 +561,26 @@ function App() {
           return nextStyles
         })
 
+        setNotice('')
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
+    })
+  }
+
+  const createManagedUser = (payload: { login: string; name: string }) => {
+    startAdminMutation(async () => {
+      try {
+        const response = await api.createAdminUser(payload)
+        setManagedUsers((current) =>
+          [response.user, ...current.filter((user) => user.id !== response.user.id)].sort((left, right) =>
+            left.login.localeCompare(right.login),
+          ),
+        )
+        setGeneratedCredentials({
+          login: response.user.login,
+          password: response.password,
+        })
         setNotice('')
       } catch (error) {
         setNotice(ensureErrorMessage(error))
@@ -587,10 +692,19 @@ function App() {
     return (
       <div className="mx-auto flex h-[100svh] w-full max-w-[560px] items-center justify-center p-4">
         <Card className="w-full bg-card/90 backdrop-blur-sm">
-          <CardHeader className="gap-2 border-b">
-            <CardTitle className="text-lg">AI Icons</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Вход для сотрудников, которым разрешен доступ к генерациям.
+          <CardHeader className="items-center gap-2 border-b text-center">
+            <CardTitle className="text-center text-lg">AI Icons</CardTitle>
+            <p className="text-center text-sm text-muted-foreground">
+              Вход для сотрудников. Для доступа, обратитесь к{' '}
+              <a
+                href="https://staff.yandex-team.ru/vidmich"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-foreground no-underline"
+              >
+                @vidmich
+              </a>
+              .
             </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 pt-4">
@@ -672,16 +786,18 @@ function App() {
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold text-foreground">{style.name}</div>
                       </div>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          openStyleCreator(style)
-                        }}
-                      >
-                        Edit
-                      </Button>
+                      {isRootAdmin ? (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openStyleCreator(style)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -701,10 +817,12 @@ function App() {
                   @vidmich
                 </a>
               </p>
-              <Button size="icon-sm" variant="outline" onClick={() => openStyleCreator()}>
-                <PlusIcon />
-                <span className="sr-only">Добавить стиль</span>
-              </Button>
+              {isRootAdmin ? (
+                <Button size="icon-sm" variant="outline" onClick={() => openStyleCreator()}>
+                  <PlusIcon />
+                  <span className="sr-only">Добавить стиль</span>
+                </Button>
+              ) : null}
             </div>
           </CardFooter>
         </Card>
@@ -776,6 +894,13 @@ function App() {
             </CardTitle>
             <CardAction className="self-center">
               <div className="flex items-center gap-2">
+                {quotaLabel ? <span className="text-xs text-muted-foreground">{quotaLabel}</span> : null}
+                {isRootAdmin ? (
+                  <Button size="sm" variant="ghost" onClick={() => setIsAdminPanelOpen(true)}>
+                    <Settings2Icon data-icon="inline-start" />
+                    Панель управления
+                  </Button>
+                ) : null}
                 <Button size="sm" variant="ghost" onClick={handleLogout}>
                   Выйти
                 </Button>
@@ -993,6 +1118,19 @@ function App() {
         }}
       />
 
+      <AdminPanel
+        busy={isAdminBusy}
+        generatedCredentials={generatedCredentials}
+        loading={isAdminLoading}
+        onClose={() => {
+          setIsAdminPanelOpen(false)
+          setGeneratedCredentials(null)
+        }}
+        onCreateUser={createManagedUser}
+        open={isAdminPanelOpen}
+        users={managedUsers}
+      />
+
       <Dialog open={Boolean(previewAsset)} onOpenChange={(open) => !open && setPreviewAsset(null)}>
         <DialogContent className="max-w-4xl p-3 sm:p-4">
           {previewAsset ? (
@@ -1012,6 +1150,128 @@ function App() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+type AdminPanelProps = {
+  busy: boolean
+  generatedCredentials: { login: string; password: string } | null
+  loading: boolean
+  onClose: () => void
+  onCreateUser: (payload: { login: string; name: string }) => void
+  open: boolean
+  users: ManagedUser[]
+}
+
+function AdminPanel({
+  busy,
+  generatedCredentials,
+  loading,
+  onClose,
+  onCreateUser,
+  open,
+  users,
+}: AdminPanelProps) {
+  const [login, setLogin] = useState('')
+  const [name, setName] = useState('')
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Панель управления</DialogTitle>
+          <DialogDescription>
+            Доступами управляет только `vidmich`. Для каждого пользователя действует лимит 100 генераций в месяц.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-foreground">Логин</label>
+                <Input
+                  value={login}
+                  onChange={(event) => setLogin(event.target.value.toLowerCase())}
+                  placeholder="manager01"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-foreground">Имя</label>
+                <Input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Менеджер"
+                />
+              </div>
+            </div>
+            <Button
+              className="w-full md:w-auto"
+              disabled={busy || !login.trim() || !name.trim()}
+              onClick={() => {
+                onCreateUser({ login: login.trim(), name: name.trim() })
+                setLogin('')
+                setName('')
+              }}
+            >
+              {busy ? <LoadingSpinner label="Создаем пользователя" size="sm" /> : 'Сгенерировать доступ'}
+            </Button>
+          </div>
+
+          {generatedCredentials ? (
+            <div className="grid gap-2 rounded-xl border border-border bg-background p-3">
+              <div className="text-sm font-semibold text-foreground">Новые доступы</div>
+              <div className="text-sm text-muted-foreground">Логин: {generatedCredentials.login}</div>
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2">
+                <code className="text-sm text-foreground">{generatedCredentials.password}</code>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void navigator.clipboard.writeText(generatedCredentials.password)}
+                >
+                  <CopyIcon data-icon="inline-start" />
+                  Копировать
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="rounded-xl border border-border">
+            <ScrollArea className="max-h-[42svh]">
+              <div className="grid gap-2 p-3">
+                {loading ? (
+                  <div className="flex min-h-24 items-center justify-center">
+                    <LoadingSpinner label="Загружаем пользователей" />
+                  </div>
+                ) : (
+                  users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-foreground">{user.login}</div>
+                        <div className="truncate text-xs text-muted-foreground">{user.name}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs font-medium text-foreground">{user.quota.remaining}/{user.quota.limit}</div>
+                        <div className="text-[11px] text-muted-foreground">{user.role}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Закрыть
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

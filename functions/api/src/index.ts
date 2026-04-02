@@ -66,6 +66,18 @@ type SessionRecord = {
   expiresAt: string
 }
 
+type UsageManifest = {
+  period: string
+  users: Record<string, number>
+}
+
+type GenerationQuota = {
+  limit: number
+  used: number
+  remaining: number
+  period: string
+}
+
 const isDefaultPreviewPath = (value: string) => value.startsWith('/previews/')
 
 const getEmbeddedDefaultPreview = (styleId: string) => {
@@ -141,7 +153,10 @@ const defaultStyles: StylePreset[] = [
 const stylesManifestKey = 'config/styles.json'
 const usersManifestKey = 'auth/users.json'
 const sessionsPrefix = 'auth/sessions'
+const usagePrefix = 'auth/usage'
 const sessionTtlMs = 1000 * 60 * 60 * 24 * 7
+const monthlyGenerationLimit = 100
+const rootAdminLogin = 'vidmich'
 
 const generationSchema = z.object({
   imageUrl: z.url(),
@@ -309,12 +324,27 @@ const verifyPassword = (password: string, salt: string, expectedHash: string) =>
   return timingSafeEqual(actual, expected)
 }
 
-const toPublicUser = (user: StoredUser) => ({
-  id: user.id,
-  login: user.login,
-  name: user.name,
-  role: user.role,
+const currentUsagePeriod = () => new Date().toISOString().slice(0, 7)
+
+const usageObjectKey = (period: string) => `${usagePrefix}/${period}.json`
+
+const buildQuota = (used: number, period = currentUsagePeriod()): GenerationQuota => ({
+  limit: monthlyGenerationLimit,
+  used,
+  remaining: Math.max(monthlyGenerationLimit - used, 0),
+  period,
 })
+
+const isRootAdmin = (user: StoredUser) => user.login === rootAdminLogin
+
+const randomPassword = (length = 24) => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  const bytes = randomBytes(length)
+
+  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('')
+}
+
+const normalizeLogin = (value: string) => value.trim().toLowerCase()
 
 const createSessionCookie = (token: string, expiresAt: string) => {
   const env = getEnv()
@@ -389,6 +419,79 @@ const readUsers = async (): Promise<StoredUser[]> => {
 const writeUsers = async (users: StoredUser[]) => {
   await writeStorageText(usersManifestKey, JSON.stringify(users, null, 2))
 }
+
+const readUsage = async (period = currentUsagePeriod()): Promise<UsageManifest> => {
+  try {
+    const raw = await readStorageText(usageObjectKey(period))
+
+    return z.object({
+      period: z.string(),
+      users: z.record(z.string(), z.number().int().nonnegative()),
+    }).parse(JSON.parse(raw))
+  } catch (error) {
+    const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode
+    if (statusCode === 404) {
+      return { period, users: {} }
+    }
+
+    throw error
+  }
+}
+
+const writeUsage = async (usage: UsageManifest) => {
+  await writeStorageText(usageObjectKey(usage.period), JSON.stringify(usage, null, 2))
+}
+
+const getUserQuota = async (user: StoredUser) => {
+  const usage = await readUsage()
+  return buildQuota(usage.users[user.login] ?? 0, usage.period)
+}
+
+const reserveGenerationQuota = async (user: StoredUser) => {
+  const usage = await readUsage()
+  const used = usage.users[user.login] ?? 0
+
+  if (used >= monthlyGenerationLimit) {
+    return {
+      ok: false as const,
+      quota: buildQuota(used, usage.period),
+    }
+  }
+
+  const nextUsage: UsageManifest = {
+    ...usage,
+    users: {
+      ...usage.users,
+      [user.login]: used + 1,
+    },
+  }
+
+  await writeUsage(nextUsage)
+
+  return {
+    ok: true as const,
+    quota: buildQuota(used + 1, usage.period),
+  }
+}
+
+const toPublicUser = async (user: StoredUser) => ({
+  id: user.id,
+  login: user.login,
+  name: user.name,
+  role: user.role,
+  quota: await getUserQuota(user),
+})
+
+const toManagedUser = async (user: StoredUser) => ({
+  id: user.id,
+  login: user.login,
+  name: user.name,
+  role: user.role,
+  disabled: user.disabled,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+  quota: await getUserQuota(user),
+})
 
 const readSession = async (sessionId: string): Promise<SessionRecord | null> => {
   try {
@@ -781,7 +884,8 @@ const appHandler = async (event: HttpEvent) => {
       path === '/assets' ||
       path === '/generations' ||
       path.startsWith('/jobs/') ||
-      path === '/download'
+      path === '/download' ||
+      path === '/admin/users'
 
     if (isProtectedRoute && !currentUser) {
       return response(
@@ -798,7 +902,9 @@ const appHandler = async (event: HttpEvent) => {
       }).parse(await request.json())
 
       const users = await readUsers()
-      const user = users.find((entry) => entry.login === payload.login && !entry.disabled)
+      const user = users.find(
+        (entry) => entry.login === normalizeLogin(payload.login) && !entry.disabled,
+      )
 
       if (!user || !verifyPassword(payload.password, user.passwordSalt, user.passwordHash)) {
         return response(401, { error: 'Неверный логин или пароль' })
@@ -819,7 +925,7 @@ const appHandler = async (event: HttpEvent) => {
       return response(
         200,
         {
-          user: toPublicUser(user),
+          user: await toPublicUser(user),
         },
         {
           'Set-Cookie': createSessionCookie(session.id, session.expiresAt),
@@ -837,7 +943,7 @@ const appHandler = async (event: HttpEvent) => {
       }
 
       return response(200, {
-        user: toPublicUser(currentUser.user),
+        user: await toPublicUser(currentUser.user),
       })
     }
 
@@ -859,6 +965,10 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'POST' && path === '/styles') {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
       const formData = await request.formData()
       const styles = await readStyles()
       const file = formData.get('previewFile')
@@ -888,6 +998,10 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'PUT' && path.startsWith('/styles/')) {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
       const styleId = path.split('/').pop() ?? ''
       const formData = await request.formData()
       const styles = await readStyles()
@@ -918,6 +1032,10 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'DELETE' && path.startsWith('/styles/')) {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
       const styleId = path.split('/').pop() ?? ''
       const styles = await readStyles()
       const current = styles.find((style) => style.id === styleId)
@@ -946,6 +1064,62 @@ const appHandler = async (event: HttpEvent) => {
       return response(200, { ok: true })
     }
 
+    if (event.httpMethod === 'GET' && path === '/admin/users') {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
+      const users = await readUsers()
+      const visibleUsers = await Promise.all(
+        users
+          .filter((user) => !user.disabled)
+          .sort((left, right) => left.login.localeCompare(right.login))
+          .map((user) => toManagedUser(user)),
+      )
+
+      return response(200, { users: visibleUsers })
+    }
+
+    if (event.httpMethod === 'POST' && path === '/admin/users') {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
+      const payload = z.object({
+        login: z.string().min(3).max(64).regex(/^[a-z0-9._-]+$/),
+        name: z.string().min(1).max(120),
+      }).parse(await request.json())
+
+      const login = normalizeLogin(payload.login)
+      const users = await readUsers()
+
+      if (users.some((user) => user.login === login && !user.disabled)) {
+        return response(409, { error: 'Пользователь с таким логином уже существует' })
+      }
+
+      const now = new Date().toISOString()
+      const password = randomPassword()
+      const salt = randomBytes(16).toString('hex')
+      const nextUser: StoredUser = {
+        id: crypto.randomUUID(),
+        login,
+        name: payload.name.trim(),
+        role: 'manager',
+        passwordHash: hashPassword(password, salt),
+        passwordSalt: salt,
+        disabled: false,
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      await writeUsers([...users.filter((user) => user.login !== login), nextUser])
+
+      return response(200, {
+        user: await toManagedUser(nextUser),
+        password,
+      })
+    }
+
     if (event.httpMethod === 'POST' && path === '/assets') {
       const formData = await request.formData()
       const file = formData.get('file')
@@ -959,6 +1133,19 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'POST' && path === '/generations') {
+      if (!currentUser) {
+        return response(401, { error: 'Не авторизован' })
+      }
+
+      const quotaReservation = await reserveGenerationQuota(currentUser.user)
+
+      if (!quotaReservation.ok) {
+        return response(429, {
+          error: 'Лимит генераций на этот месяц исчерпан',
+          quota: quotaReservation.quota,
+        })
+      }
+
       const styles = await readStyles()
       const payload = generationSchema.parse(await request.json())
       const style = styles.find((entry) => entry.id === payload.styleId)
@@ -974,7 +1161,10 @@ const appHandler = async (event: HttpEvent) => {
         batchSize: 1,
       })
 
-      return response(200, job)
+      return response(200, {
+        ...job,
+        quota: quotaReservation.quota,
+      })
     }
 
     if (event.httpMethod === 'GET' && path.startsWith('/jobs/')) {
