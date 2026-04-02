@@ -477,7 +477,6 @@ function App() {
           <div className="panel-head">
             <div>
               <span className="panel-kicker">1. Пресеты</span>
-              <h2>Выбор стиля</h2>
             </div>
             <button
               className="ghost-button"
@@ -536,7 +535,6 @@ function App() {
           <div className="panel-head">
             <div>
               <span className="panel-kicker">2. Drag and Drop</span>
-              <h2>Загрузка исходников</h2>
             </div>
             <button className="ghost-button" onClick={clearUploads} type="button">
               Очистить
@@ -584,8 +582,7 @@ function App() {
         >
           <div className="panel-head">
             <div>
-              <span className="panel-kicker">3. Результат</span>
-              <h2>Генерации и скачать</h2>
+              <span className="panel-kicker">Результат</span>
             </div>
             <button className="ghost-button" onClick={clearHistoryState} type="button">
               Очистить
