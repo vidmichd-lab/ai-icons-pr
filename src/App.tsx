@@ -1196,7 +1196,7 @@ function AdminPanel({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="w-[min(92vw,760px)] max-w-[760px]">
         <DialogHeader>
           <DialogTitle>Панель управления</DialogTitle>
           <DialogDescription>
