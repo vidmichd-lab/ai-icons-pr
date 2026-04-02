@@ -2,6 +2,12 @@ openapi: 3.0.0
 info:
   title: AI Icons API
   version: 2.0.0
+x-yc-apigateway:
+  variables:
+    function_id:
+      default: "d4eieshbjp15jf8vh9p0"
+    app_origin:
+      default: "https://ai-icons-practicum.website.yandexcloud.net"
 components:
   securitySchemes:
     sessionCookie:
@@ -10,7 +16,7 @@ components:
       name: ai_icons_session
       x-yc-apigateway-authorizer:
         type: function
-        function_id: ${function_id}
+        function_id: ${var.function_id}
         tag: "$latest"
         authorizer_result_ttl_in_seconds: 60
 paths:
@@ -22,7 +28,7 @@ paths:
         content:
           '*': ''
         http_headers:
-          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Origin: ${var.app_origin}
           Access-Control-Allow-Credentials: 'true'
           Access-Control-Allow-Headers: Content-Type
           Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
@@ -34,7 +40,7 @@ paths:
         - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
-        function_id: ${function_id}
+        function_id: ${var.function_id}
         tag: "$latest"
         payload_format_version: "1.0"
       responses:
@@ -48,7 +54,7 @@ paths:
         content:
           '*': ''
         http_headers:
-          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Origin: ${var.app_origin}
           Access-Control-Allow-Credentials: 'true'
           Access-Control-Allow-Headers: Content-Type
           Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
@@ -58,7 +64,7 @@ paths:
     post:
       x-yc-apigateway-integration:
         type: cloud_functions
-        function_id: ${function_id}
+        function_id: ${var.function_id}
         tag: "$latest"
         payload_format_version: "1.0"
       responses:
@@ -78,7 +84,7 @@ paths:
         content:
           '*': ''
         http_headers:
-          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Origin: ${var.app_origin}
           Access-Control-Allow-Credentials: 'true'
           Access-Control-Allow-Headers: Content-Type
           Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
@@ -90,7 +96,7 @@ paths:
         - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
-        function_id: ${function_id}
+        function_id: ${var.function_id}
         tag: "$latest"
         payload_format_version: "1.0"
       responses:
