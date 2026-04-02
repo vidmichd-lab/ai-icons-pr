@@ -543,7 +543,7 @@ function App() {
                       className={cn(
                         'flex w-full items-center gap-3 rounded-xl border border-border bg-background/80 p-2 text-left transition hover:bg-muted/70',
                         style.id === selectedStyleId &&
-                          'border-secondary bg-accent ring-2 ring-secondary shadow-[0_0_0_1px_hsl(var(--secondary))]',
+                          'border-secondary bg-muted ring-1 ring-secondary/40',
                       )}
                     >
                       <img
@@ -675,7 +675,7 @@ function App() {
                     <Card
                       key={session.id}
                       size="sm"
-                      className="bg-background py-3 shadow-sm ring-1 ring-border/70"
+                      className="border border-border bg-background py-3 shadow-none"
                     >
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
@@ -713,7 +713,7 @@ function App() {
                               className={cn(
                                 'rounded-xl border border-border bg-muted/30 p-2 text-left transition hover:bg-muted/60',
                                 generation.id === session.activeGenerationId &&
-                                  'border-secondary bg-accent ring-2 ring-secondary shadow-[0_0_0_1px_hsl(var(--secondary))]',
+                                  'border-secondary bg-muted ring-1 ring-secondary/40',
                               )}
                             >
                               <div className="relative mb-2 overflow-hidden rounded-lg bg-background">
