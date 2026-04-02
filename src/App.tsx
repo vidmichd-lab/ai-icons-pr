@@ -38,6 +38,7 @@ import type {
 } from '@/types'
 
 const MAX_FILES = 10
+const STYLE_EDITOR_PASSWORD = '1337'
 
 const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 
@@ -90,6 +91,9 @@ function App() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [editingStyle, setEditingStyle] = useState<StylePreset | null>(null)
+  const [isStylesUnlocked, setIsStylesUnlocked] = useState(false)
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
+  const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
 
   useEffect(() => {
     void api.getStyles().then((response) => {
@@ -424,6 +428,12 @@ function App() {
   }
 
   const openStyleCreator = (style?: StylePreset) => {
+    if (!isStylesUnlocked) {
+      setPendingStyleAction(style ?? 'new')
+      setIsPasswordDialogOpen(true)
+      return
+    }
+
     setEditingStyle(style ?? null)
     setIsEditorOpen(true)
   }
@@ -525,15 +535,9 @@ function App() {
               <Badge variant="secondary">1</Badge>
               Стиль
             </CardTitle>
-            <CardAction>
-              <Button size="sm" variant="outline" onClick={() => openStyleCreator()}>
-                <PlusIcon data-icon="inline-start" />
-                Добавить
-              </Button>
-            </CardAction>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
-            <ScrollArea className="h-[calc(100vh-14rem)] pr-2">
+            <ScrollArea className="h-[calc(100vh-13rem)] pr-2">
               <div className="flex flex-col gap-2">
                 {styles.map((style) => (
                   <button
@@ -552,9 +556,6 @@ function App() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-foreground">{style.name}</div>
-                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                        {style.shortPrompt}
-                      </p>
                     </div>
                     <Button
                       size="xs"
@@ -570,17 +571,13 @@ function App() {
                 ))}
               </div>
             </ScrollArea>
-            {selectedStyle ? (
-              <>
-                <Separator />
-                <div className="rounded-xl bg-muted/60 p-3">
-                  <div className="text-sm font-semibold text-foreground">{selectedStyle.name}</div>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    {selectedStyle.prompt}
-                  </p>
-                </div>
-              </>
-            ) : null}
+            <Separator />
+            <div className="flex justify-center">
+              <Button size="icon-sm" variant="outline" onClick={() => openStyleCreator()}>
+                <PlusIcon />
+                <span className="sr-only">Добавить стиль</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -800,6 +797,29 @@ function App() {
         open={isEditorOpen}
         style={editingStyle}
       />
+
+      <PasswordDialog
+        key={`${String(pendingStyleAction ?? 'none')}-${isPasswordDialogOpen ? 'open' : 'closed'}`}
+        open={isPasswordDialogOpen}
+        onClose={() => {
+          setIsPasswordDialogOpen(false)
+          setPendingStyleAction(null)
+        }}
+        onSuccess={() => {
+          setIsStylesUnlocked(true)
+          setIsPasswordDialogOpen(false)
+
+          if (pendingStyleAction === 'new') {
+            setEditingStyle(null)
+            setIsEditorOpen(true)
+          } else if (pendingStyleAction) {
+            setEditingStyle(pendingStyleAction)
+            setIsEditorOpen(true)
+          }
+
+          setPendingStyleAction(null)
+        }}
+      />
     </div>
   )
 }
@@ -888,6 +908,60 @@ function StyleEditor({
               {busy ? 'Сохраняю…' : 'Сохранить'}
             </Button>
           </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type PasswordDialogProps = {
+  onClose: () => void
+  onSuccess: () => void
+  open: boolean
+}
+
+function PasswordDialog({ onClose, onSuccess, open }: PasswordDialogProps) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Доступ к стилям</DialogTitle>
+          <DialogDescription>
+            Для добавления и редактирования стилей введите пароль.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <Input
+            type="password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value)
+              if (error) {
+                setError('')
+              }
+            }}
+          />
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            onClick={() => {
+              if (password === STYLE_EDITOR_PASSWORD) {
+                onSuccess()
+                return
+              }
+
+              setError('Неверный пароль')
+            }}
+          >
+            Войти
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
