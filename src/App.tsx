@@ -1,19 +1,41 @@
-import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { clsx } from 'clsx'
+import { DownloadIcon, PaintBucketIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
 import { zipSync, strToU8 } from 'fflate'
 
-import './App.css'
-import { api } from './lib/api'
-import { clearHistory, loadHistory, saveHistory } from './lib/history'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
+import { clearHistory, loadHistory, saveHistory } from '@/lib/history'
+import { cn } from '@/lib/utils'
 import type {
   EditableStylePayload,
   GeneratedAsset,
   HistorySession,
   SourceUpload,
   StylePreset,
-} from './types'
+} from '@/types'
 
 const MAX_FILES = 10
 
@@ -73,8 +95,7 @@ function App() {
 
   const onDrop = (acceptedFiles: File[]) => {
     setUploads((current) => {
-      const alreadySelected = current.length
-      const freeSlots = Math.max(MAX_FILES - alreadySelected, 0)
+      const freeSlots = Math.max(MAX_FILES - current.length, 0)
       const nextUploads = acceptedFiles.slice(0, freeSlots).map((file) => ({
         id: crypto.randomUUID(),
         file,
@@ -99,6 +120,11 @@ function App() {
 
   const clearUploads = () => {
     setUploads([])
+  }
+
+  const clearHistoryState = () => {
+    clearHistory()
+    setHistory([])
   }
 
   const handleGenerate = () => {
@@ -370,9 +396,36 @@ function App() {
     })
   }
 
-  const clearHistoryState = () => {
-    clearHistory()
-    setHistory([])
+  const openStyleCreator = (style?: StylePreset) => {
+    setEditingStyle(style ?? null)
+    setIsEditorOpen(true)
+  }
+
+  const upsertStyle = (payload: EditableStylePayload) => {
+    startStylesMutation(async () => {
+      const nextStyle = payload.id
+        ? await api.updateStyle(payload.id, payload)
+        : await api.createStyle(payload)
+
+      setStyles((current) => {
+        const withoutCurrent = current.filter((style) => style.id !== nextStyle.id)
+        return [nextStyle, ...withoutCurrent]
+      })
+
+      setSelectedStyleId(nextStyle.id)
+      setIsEditorOpen(false)
+      setEditingStyle(null)
+    })
+  }
+
+  const removeStyle = (styleId: string) => {
+    startStylesMutation(async () => {
+      await api.deleteStyle(styleId)
+      setStyles((current) => current.filter((style) => style.id !== styleId))
+      setSelectedStyleId((current) =>
+        current === styleId ? styles.find((style) => style.id !== styleId)?.id ?? '' : current,
+      )
+    })
   }
 
   const downloadPng = async (url: string, fileName: string) => {
@@ -409,7 +462,6 @@ function App() {
         const response = await fetch(generation.resultUrl!)
         const buffer = new Uint8Array(await response.arrayBuffer())
         const safeName = `${session.sourceName.replace(/\.[^.]+$/, '')}-${index + 1}.png`
-
         return [safeName, buffer] as const
       }),
     )
@@ -423,7 +475,6 @@ function App() {
     }
 
     const archive = zipSync(archiveEntries)
-
     const blob = new Blob([archive as BlobPart], { type: 'application/zip' })
     const objectUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -433,271 +484,255 @@ function App() {
     URL.revokeObjectURL(objectUrl)
   }
 
-  const openStyleCreator = (style?: StylePreset) => {
-    setEditingStyle(style ?? null)
-    setIsEditorOpen(true)
-  }
-
-  const upsertStyle = (payload: EditableStylePayload) => {
-    startStylesMutation(async () => {
-      const nextStyle = payload.id
-        ? await api.updateStyle(payload.id, payload)
-        : await api.createStyle(payload)
-
-      setStyles((current) => {
-        const withoutCurrent = current.filter((style) => style.id !== nextStyle.id)
-        return [nextStyle, ...withoutCurrent]
-      })
-
-      setSelectedStyleId(nextStyle.id)
-      setIsEditorOpen(false)
-      setEditingStyle(null)
-    })
-  }
-
-  const removeStyle = (styleId: string) => {
-    startStylesMutation(async () => {
-      await api.deleteStyle(styleId)
-      setStyles((current) => current.filter((style) => style.id !== styleId))
-      setSelectedStyleId((current) =>
-        current === styleId ? styles.find((style) => style.id !== styleId)?.id ?? '' : current,
-      )
-    })
-  }
-
   return (
-    <div className="app-shell">
-      <section className="workspace-grid workspace-grid--triple">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="panel column-panel column-panel--styles"
-        >
-          <div className="panel-head">
-            <div>
-              <span className="panel-kicker">1. Пресеты</span>
-            </div>
-            <button
-              className="ghost-button"
-              onClick={() => openStyleCreator()}
-              type="button"
-            >
-              Добавить
-            </button>
-          </div>
-
-          <div className="style-grid style-grid--column">
-            {styles.map((style) => (
-              <button
-                key={style.id}
-                className={clsx(
-                  'style-card',
-                  style.id === selectedStyleId && 'style-card--selected',
-                )}
-                type="button"
-                onClick={() => setSelectedStyleId(style.id)}
-              >
-                <img src={style.previewUrl} alt={style.name} />
-                <div className="style-card__meta">
-                  <strong>{style.name}</strong>
-                  <span>{style.shortPrompt}</span>
-                </div>
-                <div className="style-card__actions">
-                  <span>{style.id === selectedStyleId ? 'Выбран' : 'Выбрать'}</span>
-                  <span
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      openStyleCreator(style)
-                    }}
+    <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col p-4 md:p-6">
+      <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
+        <Card className="bg-card/85 backdrop-blur-sm">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Badge variant="secondary">1</Badge>
+              Стиль
+            </CardTitle>
+            <CardAction>
+              <Button size="sm" variant="outline" onClick={() => openStyleCreator()}>
+                <PlusIcon data-icon="inline-start" />
+                Добавить
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
+            <ScrollArea className="h-[calc(100vh-14rem)] pr-2">
+              <div className="flex flex-col gap-2">
+                {styles.map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => setSelectedStyleId(style.id)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-xl border border-border bg-background/80 p-2 text-left transition hover:bg-muted/70',
+                      style.id === selectedStyleId && 'border-secondary bg-accent/70 ring-1 ring-secondary/40',
+                    )}
                   >
-                    Редактировать
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="style-footer">
-            <div>
-              <strong>{selectedStyle?.name ?? 'Стиль не выбран'}</strong>
-              <p>{selectedStyle?.prompt}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.04 }}
-          className="panel column-panel"
-        >
-          <div className="panel-head">
-            <div>
-              <span className="panel-kicker">2. Drag and Drop</span>
-            </div>
-            <button className="ghost-button" onClick={clearUploads} type="button">
-              Очистить
-            </button>
-          </div>
-
-          <div
-            {...getRootProps()}
-            className={clsx('dropzone', isDragActive && 'dropzone--active')}
-          >
-            <input {...getInputProps()} />
-            <strong>Перетащите PNG, JPG или WebP</strong>
-            <span>до 10 файлов, квадратный исходник на белом фоне</span>
-          </div>
-
-          <div className="upload-grid upload-grid--column">
-            {uploads.map((upload) => (
-              <article key={upload.id} className="upload-card">
-                <img src={upload.previewUrl} alt={upload.name} />
-                <div>
-                  <strong>{upload.name}</strong>
-                  <span>готов к отправке</span>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="upload-actions">
-            <button
-              className="primary-button primary-button--wide"
-              disabled={!isHydrated || isGenerating || uploads.length === 0}
-              onClick={handleGenerate}
-              type="button"
-            >
-              {isGenerating ? 'Генерация идет…' : 'Сгенерировать'}
-            </button>
-          </div>
-        </motion.div>
-
-        <motion.aside
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.08 }}
-          className="panel column-panel column-panel--results sticky-panel"
-        >
-          <div className="panel-head">
-            <div>
-              <span className="panel-kicker">Результат</span>
-            </div>
-            <button className="ghost-button" onClick={clearHistoryState} type="button">
-              Очистить
-            </button>
-          </div>
-
-          <div className="history-stack">
-            {history.map((session) => {
-              const activeGeneration =
-                session.generations.find(
-                  (generation) => generation.id === session.activeGenerationId,
-                ) ?? session.generations[0]
-
-              return (
-                <article key={session.id} className="history-card">
-                  <div className="history-card__top">
                     <img
-                      src={activeGeneration?.resultUrl ?? session.sourcePreviewUrl}
-                      alt={session.sourceName}
+                      src={style.previewUrl}
+                      alt={style.name}
+                      className="size-16 rounded-lg object-cover"
                     />
-                    <div>
-                      <strong>{session.sourceName}</strong>
-                      <span>{session.styleName}</span>
-                      <p>{activeGeneration?.error ?? statusLabel(activeGeneration?.status)}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-foreground">{style.name}</div>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        {style.shortPrompt}
+                      </p>
+                    </div>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openStyleCreator(style)
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+            {selectedStyle ? (
+              <>
+                <Separator />
+                <div className="rounded-xl bg-muted/60 p-3">
+                  <div className="text-sm font-semibold text-foreground">{selectedStyle.name}</div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {selectedStyle.prompt}
+                  </p>
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/85 backdrop-blur-sm">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Badge variant="secondary">2</Badge>
+              Загрузка
+            </CardTitle>
+            <CardDescription>До 10 файлов, лучше квадратный исходник на белом фоне.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+            <div
+              {...getRootProps()}
+              className={cn(
+                'flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/70 px-4 py-6 text-center transition',
+                isDragActive && 'border-secondary bg-accent/60',
+              )}
+            >
+              <input {...getInputProps()} />
+              <div className="text-sm font-semibold text-foreground">Перетащите файлы сюда</div>
+              <p className="mt-1 text-xs text-muted-foreground">PNG, JPG или WebP</p>
+            </div>
+
+            <ScrollArea className="h-[calc(100vh-22rem)] pr-2">
+              <div className="grid gap-2">
+                {uploads.map((upload) => (
+                  <div
+                    key={upload.id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background/80 p-2"
+                  >
+                    <img
+                      src={upload.previewUrl}
+                      alt={upload.name}
+                      className="size-16 rounded-lg object-cover"
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-foreground">{upload.name}</div>
                     </div>
                   </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+          <CardFooter className="mt-auto flex-col gap-2">
+            <Button
+              className="w-full"
+              disabled={!isHydrated || isGenerating || uploads.length === 0}
+              onClick={handleGenerate}
+            >
+              {isGenerating ? 'Генерация идет…' : 'Сгенерировать'}
+            </Button>
+            {uploads.length > 0 ? (
+              <Button className="w-full" variant="outline" onClick={clearUploads}>
+                <Trash2Icon data-icon="inline-start" />
+                Очистить
+              </Button>
+            ) : null}
+          </CardFooter>
+        </Card>
 
-                  <div className="history-thumbs">
-                    {session.generations.map((generation) => (
-                      <button
-                        key={generation.id}
-                        type="button"
-                        className={clsx(
-                          'thumb-button',
-                          generation.id === session.activeGenerationId &&
-                            'thumb-button--active',
-                        )}
-                        onClick={() =>
-                          setHistory((current) =>
-                            updateSession(current, session.id, (item) => ({
-                              ...item,
-                              activeGenerationId: generation.id,
-                            })),
-                          )
-                        }
-                      >
-                        <div className="thumb-button__image">
-                          {generation.resultUrl ? (
-                            <img src={generation.resultUrl} alt={generation.label} />
-                          ) : (
-                            <span>{shortStatus(generation.status)}</span>
-                          )}
+        <Card className="bg-card/85 backdrop-blur-sm">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Badge variant="secondary">3</Badge>
+              Результат
+            </CardTitle>
+            <CardAction>
+              <Button size="sm" variant="outline" onClick={clearHistoryState}>
+                <Trash2Icon data-icon="inline-start" />
+                Очистить
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="px-3">
+            <ScrollArea className="h-[calc(100vh-12rem)] pr-2">
+              <div className="flex flex-col gap-3">
+                {history.map((session) => {
+                  const activeGeneration =
+                    session.generations.find(
+                      (generation) => generation.id === session.activeGenerationId,
+                    ) ?? session.generations[0]
+
+                  return (
+                    <Card key={session.id} size="sm" className="bg-background/85 py-3">
+                      <CardHeader className="gap-3">
+                        <div className="flex items-start gap-3">
+                          <img
+                            src={activeGeneration?.resultUrl ?? session.sourcePreviewUrl}
+                            alt={session.sourceName}
+                            className="size-24 rounded-lg object-cover"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-foreground">
+                              {session.sourceName}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{session.styleName}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {activeGeneration?.error ?? statusLabel(activeGeneration?.status)}
+                            </p>
+                          </div>
                         </div>
-                        <small>{generation.label}</small>
-                      </button>
-                    ))}
-                  </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-3 gap-2 md:grid-cols-4 xl:grid-cols-5">
+                          {session.generations.map((generation) => (
+                            <button
+                              key={generation.id}
+                              type="button"
+                              className={cn(
+                                'rounded-xl border border-border bg-muted/30 p-2 text-left transition hover:bg-muted/60',
+                                generation.id === session.activeGenerationId &&
+                                  'border-secondary bg-accent/70 ring-1 ring-secondary/40',
+                              )}
+                              onClick={() =>
+                                setHistory((current) =>
+                                  updateSession(current, session.id, (item) => ({
+                                    ...item,
+                                    activeGenerationId: generation.id,
+                                  })),
+                                )
+                              }
+                            >
+                              <div className="mb-2 overflow-hidden rounded-lg bg-background">
+                                {generation.resultUrl ? (
+                                  <img
+                                    src={generation.resultUrl}
+                                    alt={generation.label}
+                                    className="aspect-square w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex aspect-square items-center justify-center text-xs font-semibold text-muted-foreground">
+                                    {shortStatus(generation.status)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="truncate text-[11px] font-medium text-foreground">
+                                {generation.label}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => reroll(session)}>
+                          <RefreshCcwIcon data-icon="inline-start" />
+                          Новый seed
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => removeBackground(session)}>
+                          <PaintBucketIcon data-icon="inline-start" />
+                          Обтравить
+                        </Button>
+                        <Button size="sm" onClick={() => void downloadArchive(session)}>
+                          <DownloadIcon data-icon="inline-start" />
+                          Скачать
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  )
+                })}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
 
-                  <div className="history-actions">
-                    <button
-                      className="ghost-button"
-                      onClick={() => reroll(session)}
-                      type="button"
-                    >
-                      Новый seed
-                    </button>
-                    <button
-                      className="ghost-button"
-                      onClick={() => removeBackground(session)}
-                      type="button"
-                    >
-                      Обтравить
-                    </button>
-                    <button
-                      className="primary-button"
-                      onClick={() => void downloadArchive(session)}
-                      type="button"
-                    >
-                      Скачать
-                    </button>
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </motion.aside>
-      </section>
+      {notice ? (
+        <div className="pointer-events-none fixed right-4 bottom-4 z-50 rounded-xl bg-primary px-4 py-3 text-sm text-primary-foreground shadow-lg">
+          {notice}
+        </div>
+      ) : null}
 
-      <AnimatePresence>
-        {notice ? (
-          <motion.div
-            className="notice"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-          >
-            {notice}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isEditorOpen ? (
-          <StyleEditor
-            busy={isStylesBusy}
-            onClose={() => {
-              setIsEditorOpen(false)
-              setEditingStyle(null)
-            }}
-            onDelete={editingStyle ? removeStyle : undefined}
-            onSubmit={upsertStyle}
-            style={editingStyle}
-          />
-        ) : null}
-      </AnimatePresence>
+      <StyleEditor
+        busy={isStylesBusy}
+        key={editingStyle?.id ?? 'new-style'}
+        onClose={() => {
+          setIsEditorOpen(false)
+          setEditingStyle(null)
+        }}
+        onDelete={editingStyle ? removeStyle : undefined}
+        onSubmit={upsertStyle}
+        open={isEditorOpen}
+        style={editingStyle}
+      />
     </div>
   )
 }
@@ -707,6 +742,7 @@ type StyleEditorProps = {
   onClose: () => void
   onDelete?: (styleId: string) => void
   onSubmit: (payload: EditableStylePayload) => void
+  open: boolean
   style: StylePreset | null
 }
 
@@ -715,6 +751,7 @@ function StyleEditor({
   onClose,
   onDelete,
   onSubmit,
+  open,
   style,
 }: StyleEditorProps) {
   const [name, setName] = useState(style?.name ?? '')
@@ -722,81 +759,71 @@ function StyleEditor({
   const [previewFile, setPreviewFile] = useState<File | null>(null)
 
   return (
-    <motion.div
-      className="modal-backdrop"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        className="modal"
-        initial={{ opacity: 0, y: 32 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 32 }}
-      >
-        <div className="panel-head">
-          <div>
-            <span className="panel-kicker">Style editor</span>
-            <h2>{style ? 'Редактировать стиль' : 'Новый стиль'}</h2>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{style ? 'Редактировать стиль' : 'Новый стиль'}</DialogTitle>
+          <DialogDescription>
+            Все элементы интерфейса здесь переведены на единый shadcn-слой.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-foreground">Название</label>
+            <Input value={name} onChange={(event) => setName(event.target.value)} />
           </div>
-          <button className="ghost-button" onClick={onClose} type="button">
-            Закрыть
-          </button>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-foreground">Prompt</label>
+            <Textarea
+              rows={7}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-foreground">Preview</label>
+            <Input
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => setPreviewFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+          </div>
         </div>
 
-        <label className="field">
-          <span>Название</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-
-        <label className="field">
-          <span>Prompt</span>
-          <textarea
-            rows={6}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-          />
-        </label>
-
-        <label className="field">
-          <span>Preview PNG</span>
-          <input
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(event) => setPreviewFile(event.target.files?.[0] ?? null)}
-            type="file"
-          />
-        </label>
-
-        <div className="history-actions">
+        <DialogFooter className="gap-2 sm:justify-between">
           {style && onDelete ? (
-            <button
-              className="ghost-button ghost-button--danger"
-              disabled={busy}
-              onClick={() => onDelete(style.id)}
-              type="button"
-            >
+            <Button variant="outline" onClick={() => onDelete(style.id)} disabled={busy}>
+              <Trash2Icon data-icon="inline-start" />
               Удалить
-            </button>
-          ) : null}
-          <button
-            className="primary-button"
-            disabled={busy || !name.trim() || !prompt.trim()}
-            onClick={() =>
-              onSubmit({
-                id: style?.id,
-                name,
-                prompt,
-                previewFile,
-                previewUrl: style?.previewUrl,
-              })
-            }
-            type="button"
-          >
-            {busy ? 'Сохраняю…' : 'Сохранить'}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button
+              disabled={busy || !name.trim() || !prompt.trim()}
+              onClick={() =>
+                onSubmit({
+                  id: style?.id,
+                  name,
+                  prompt,
+                  previewFile,
+                  previewUrl: style?.previewUrl,
+                })
+              }
+            >
+              {busy ? 'Сохраняю…' : 'Сохранить'}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
