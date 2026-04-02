@@ -17,12 +17,6 @@ import type {
 
 const MAX_FILES = 10
 
-const posterMessages = [
-  'Подготовьте чистые 1024x1024 исходники и прогоняйте пачкой одним кликом.',
-  'Стили управляются через UI, история держится локально и очищается отдельно.',
-  'Reroll меняет seed, а обтравка уводит выбранную версию в прозрачный PNG.',
-]
-
 const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 
 const ensureErrorMessage = (error: unknown) =>
@@ -473,225 +467,211 @@ function App() {
 
   return (
     <div className="app-shell">
-      <section className="hero-panel">
+      <section className="workspace-grid workspace-grid--triple">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="hero-copy"
+          transition={{ duration: 0.4 }}
+          className="panel column-panel column-panel--styles"
         >
-          <span className="eyebrow">Private AI icon lab</span>
-          <h1>AI Icons Studio</h1>
-          <p>
-            Загружайте до десяти исходников, выбирайте пресет, запускайте генерацию
-            и сразу догоняйте нужную версию новым seed или обтравкой.
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.08 }}
-          className="poster"
-        >
-          {posterMessages.map((message) => (
-            <div key={message} className="poster-line">
-              {message}
+          <div className="panel-head">
+            <div>
+              <span className="panel-kicker">1. Пресеты</span>
+              <h2>Выбор стиля</h2>
             </div>
-          ))}
-        </motion.div>
-      </section>
-
-      <section className="workspace-grid">
-        <div className="main-column">
-          <div className="panel">
-            <div className="panel-head">
-              <div>
-                <span className="panel-kicker">1. Исходники</span>
-                <h2>Drag-and-drop загрузка</h2>
-              </div>
-              <button className="ghost-button" onClick={clearUploads} type="button">
-                Очистить список
-              </button>
-            </div>
-
-            <div
-              {...getRootProps()}
-              className={clsx('dropzone', isDragActive && 'dropzone--active')}
+            <button
+              className="ghost-button"
+              onClick={() => openStyleCreator()}
+              type="button"
             >
-              <input {...getInputProps()} />
-              <strong>Перетащите PNG/JPG/WebP сюда</strong>
-              <span>до 10 файлов, лучше квадрат 1024x1024 на белом фоне</span>
-            </div>
+              Добавить
+            </button>
+          </div>
 
-            <div className="upload-grid">
-              {uploads.map((upload) => (
-                <article key={upload.id} className="upload-card">
-                  <img src={upload.previewUrl} alt={upload.name} />
-                  <div>
-                    <strong>{upload.name}</strong>
-                    <span>готов к отправке</span>
+          <div className="style-grid style-grid--column">
+            {styles.map((style) => (
+              <button
+                key={style.id}
+                className={clsx(
+                  'style-card',
+                  style.id === selectedStyleId && 'style-card--selected',
+                )}
+                type="button"
+                onClick={() => setSelectedStyleId(style.id)}
+              >
+                <img src={style.previewUrl} alt={style.name} />
+                <div className="style-card__meta">
+                  <strong>{style.name}</strong>
+                  <span>{style.shortPrompt}</span>
+                </div>
+                <div className="style-card__actions">
+                  <span>{style.id === selectedStyleId ? 'Выбран' : 'Выбрать'}</span>
+                  <span
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      openStyleCreator(style)
+                    }}
+                  >
+                    Редактировать
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="style-footer">
+            <div>
+              <strong>{selectedStyle?.name ?? 'Стиль не выбран'}</strong>
+              <p>{selectedStyle?.prompt}</p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.04 }}
+          className="panel column-panel"
+        >
+          <div className="panel-head">
+            <div>
+              <span className="panel-kicker">2. Drag and Drop</span>
+              <h2>Загрузка исходников</h2>
+            </div>
+            <button className="ghost-button" onClick={clearUploads} type="button">
+              Очистить
+            </button>
+          </div>
+
+          <div
+            {...getRootProps()}
+            className={clsx('dropzone', isDragActive && 'dropzone--active')}
+          >
+            <input {...getInputProps()} />
+            <strong>Перетащите PNG, JPG или WebP</strong>
+            <span>до 10 файлов, квадратный исходник на белом фоне</span>
+          </div>
+
+          <div className="upload-grid upload-grid--column">
+            {uploads.map((upload) => (
+              <article key={upload.id} className="upload-card">
+                <img src={upload.previewUrl} alt={upload.name} />
+                <div>
+                  <strong>{upload.name}</strong>
+                  <span>готов к отправке</span>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="upload-actions">
+            <button
+              className="primary-button primary-button--wide"
+              disabled={!isHydrated || isGenerating || uploads.length === 0}
+              onClick={handleGenerate}
+              type="button"
+            >
+              {isGenerating ? 'Генерация идет…' : 'Сгенерировать'}
+            </button>
+          </div>
+        </motion.div>
+
+        <motion.aside
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.08 }}
+          className="panel column-panel column-panel--results sticky-panel"
+        >
+          <div className="panel-head">
+            <div>
+              <span className="panel-kicker">3. Результат</span>
+              <h2>Генерации и скачать</h2>
+            </div>
+            <button className="ghost-button" onClick={clearHistoryState} type="button">
+              Очистить
+            </button>
+          </div>
+
+          <div className="history-stack">
+            {history.map((session) => {
+              const activeGeneration =
+                session.generations.find(
+                  (generation) => generation.id === session.activeGenerationId,
+                ) ?? session.generations[0]
+
+              return (
+                <article key={session.id} className="history-card">
+                  <div className="history-card__top">
+                    <img
+                      src={activeGeneration?.resultUrl ?? session.sourcePreviewUrl}
+                      alt={session.sourceName}
+                    />
+                    <div>
+                      <strong>{session.sourceName}</strong>
+                      <span>{session.styleName}</span>
+                      <p>{activeGeneration?.error ?? statusLabel(activeGeneration?.status)}</p>
+                    </div>
+                  </div>
+
+                  <div className="history-thumbs">
+                    {session.generations.map((generation) => (
+                      <button
+                        key={generation.id}
+                        type="button"
+                        className={clsx(
+                          'thumb-button',
+                          generation.id === session.activeGenerationId &&
+                            'thumb-button--active',
+                        )}
+                        onClick={() =>
+                          setHistory((current) =>
+                            updateSession(current, session.id, (item) => ({
+                              ...item,
+                              activeGenerationId: generation.id,
+                            })),
+                          )
+                        }
+                      >
+                        <div className="thumb-button__image">
+                          {generation.resultUrl ? (
+                            <img src={generation.resultUrl} alt={generation.label} />
+                          ) : (
+                            <span>{shortStatus(generation.status)}</span>
+                          )}
+                        </div>
+                        <small>{generation.label}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="history-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => reroll(session)}
+                      type="button"
+                    >
+                      Новый seed
+                    </button>
+                    <button
+                      className="ghost-button"
+                      onClick={() => removeBackground(session)}
+                      type="button"
+                    >
+                      Обтравить
+                    </button>
+                    <button
+                      className="primary-button"
+                      onClick={() => void downloadArchive(session)}
+                      type="button"
+                    >
+                      Скачать
+                    </button>
                   </div>
                 </article>
-              ))}
-            </div>
+              )
+            })}
           </div>
-
-          <div className="panel">
-            <div className="panel-head">
-              <div>
-                <span className="panel-kicker">2. Стиль</span>
-                <h2>Пресеты с редактированием</h2>
-              </div>
-              <button
-                className="ghost-button"
-                onClick={() => openStyleCreator()}
-                type="button"
-              >
-                Добавить стиль
-              </button>
-            </div>
-
-            <div className="style-grid">
-              {styles.map((style) => (
-                <button
-                  key={style.id}
-                  className={clsx(
-                    'style-card',
-                    style.id === selectedStyleId && 'style-card--selected',
-                  )}
-                  type="button"
-                  onClick={() => setSelectedStyleId(style.id)}
-                >
-                  <img src={style.previewUrl} alt={style.name} />
-                  <div className="style-card__meta">
-                    <strong>{style.name}</strong>
-                    <span>{style.shortPrompt}</span>
-                  </div>
-                  <div className="style-card__actions">
-                    <span>{style.id === selectedStyleId ? 'Выбран' : 'Выбрать'}</span>
-                    <span
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openStyleCreator(style)
-                      }}
-                    >
-                      Редактировать
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="style-footer">
-              <div>
-                <strong>{selectedStyle?.name ?? 'Стиль не выбран'}</strong>
-                <p>{selectedStyle?.prompt}</p>
-              </div>
-              <button
-                className="primary-button"
-                disabled={!isHydrated || isGenerating || uploads.length === 0}
-                onClick={handleGenerate}
-                type="button"
-              >
-                {isGenerating ? 'Генерация идет…' : 'Сгенерировать'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <aside className="side-column">
-          <div className="panel sticky-panel">
-            <div className="panel-head">
-              <div>
-                <span className="panel-kicker">3. История</span>
-                <h2>Сессии и быстрые действия</h2>
-              </div>
-              <button className="ghost-button" onClick={clearHistoryState} type="button">
-                Очистить историю
-              </button>
-            </div>
-
-            <div className="history-stack">
-              {history.map((session) => {
-                const activeGeneration =
-                  session.generations.find(
-                    (generation) => generation.id === session.activeGenerationId,
-                  ) ?? session.generations[0]
-
-                return (
-                  <article key={session.id} className="history-card">
-                    <div className="history-card__top">
-                      <img
-                        src={activeGeneration?.resultUrl ?? session.sourcePreviewUrl}
-                        alt={session.sourceName}
-                      />
-                      <div>
-                        <strong>{session.sourceName}</strong>
-                        <span>{session.styleName}</span>
-                        <p>{activeGeneration?.error ?? statusLabel(activeGeneration?.status)}</p>
-                      </div>
-                    </div>
-
-                    <div className="history-thumbs">
-                      {session.generations.map((generation) => (
-                        <button
-                          key={generation.id}
-                          type="button"
-                          className={clsx(
-                            'thumb-button',
-                            generation.id === session.activeGenerationId &&
-                              'thumb-button--active',
-                          )}
-                          onClick={() =>
-                            setHistory((current) =>
-                              updateSession(current, session.id, (item) => ({
-                                ...item,
-                                activeGenerationId: generation.id,
-                              })),
-                            )
-                          }
-                        >
-                          <div className="thumb-button__image">
-                            {generation.resultUrl ? (
-                              <img src={generation.resultUrl} alt={generation.label} />
-                            ) : (
-                              <span>{shortStatus(generation.status)}</span>
-                            )}
-                          </div>
-                          <small>{generation.label}</small>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="history-actions">
-                      <button
-                        className="ghost-button"
-                        onClick={() => reroll(session)}
-                        type="button"
-                      >
-                        Новый seed
-                      </button>
-                      <button
-                        className="ghost-button"
-                        onClick={() => removeBackground(session)}
-                        type="button"
-                      >
-                        Обтравить
-                      </button>
-                      <button
-                        className="primary-button"
-                        onClick={() => void downloadArchive(session)}
-                        type="button"
-                      >
-                        Скачать
-                      </button>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </div>
-        </aside>
+        </motion.aside>
       </section>
 
       <AnimatePresence>

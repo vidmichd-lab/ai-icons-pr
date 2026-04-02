@@ -4,15 +4,6 @@
   padding: 32px 0 72px;
 }
 
-.hero-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-  gap: 24px;
-  margin-bottom: 24px;
-}
-
-.hero-copy,
-.poster,
 .panel,
 .modal {
   background: rgba(255, 255, 255, 0.78);
@@ -22,11 +13,6 @@
   backdrop-filter: blur(14px);
 }
 
-.hero-copy {
-  padding: 42px;
-}
-
-.eyebrow,
 .panel-kicker {
   display: inline-flex;
   align-items: center;
@@ -38,30 +24,9 @@
   color: #6d5a11;
 }
 
-.hero-copy h1 {
-  margin: 16px 0 12px;
-}
-
-.hero-copy p,
 .style-footer p,
 .history-card p {
   max-width: 54ch;
-}
-
-.poster {
-  padding: 24px;
-  display: grid;
-  gap: 14px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 215, 77, 0.6), transparent 36%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(255, 245, 205, 0.92));
-}
-
-.poster-line {
-  background: rgba(17, 17, 17, 0.04);
-  border-radius: 22px;
-  padding: 18px 20px;
-  color: #232323;
 }
 
 .workspace-grid {
@@ -71,8 +36,11 @@
   align-items: start;
 }
 
-.main-column,
-.side-column,
+.workspace-grid--triple {
+  grid-template-columns: minmax(270px, 0.9fr) minmax(340px, 1fr) minmax(380px, 1.1fr);
+}
+
+.column-panel,
 .history-stack {
   display: grid;
   gap: 24px;
@@ -127,6 +95,11 @@
 .upload-grid {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   margin-top: 18px;
+}
+
+.upload-grid--column,
+.style-grid--column {
+  grid-template-columns: 1fr;
 }
 
 .upload-card,
@@ -208,6 +181,15 @@
   padding: 20px 22px;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 223, 123, 0.22), rgba(255, 255, 255, 0.96));
+}
+
+.upload-actions {
+  margin-top: auto;
+}
+
+.primary-button--wide {
+  width: 100%;
+  justify-content: center;
 }
 
 .sticky-panel {
@@ -336,8 +318,8 @@
 }
 
 @media (max-width: 1080px) {
-  .hero-panel,
-  .workspace-grid {
+  .workspace-grid,
+  .workspace-grid--triple {
     grid-template-columns: 1fr;
   }
 
@@ -353,14 +335,9 @@
   }
 
   .hero-copy,
-  .poster,
   .panel,
   .modal {
     border-radius: 24px;
-  }
-
-  .hero-copy {
-    padding: 26px;
   }
 
   .panel-head,
