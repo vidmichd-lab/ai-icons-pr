@@ -581,8 +581,8 @@ function App() {
             </CardAction>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
-            <ScrollArea className="min-h-0 flex-1 pr-2">
-              <div className="flex flex-col gap-3">
+            <ScrollArea className="min-h-0 flex-1 pr-3">
+              <div className="flex flex-col gap-3 px-1 py-1">
                 {history.map((session) => {
                   const activeGeneration =
                     session.generations.find(
@@ -597,7 +597,11 @@ function App() {
                     activeGeneration
 
                   return (
-                    <Card key={session.id} size="sm" className="bg-background/85 py-3">
+                    <Card
+                      key={session.id}
+                      size="sm"
+                      className="bg-background py-3 shadow-sm ring-1 ring-border/70"
+                    >
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
                           <img
