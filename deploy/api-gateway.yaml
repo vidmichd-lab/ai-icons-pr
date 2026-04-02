@@ -1,18 +1,69 @@
 openapi: 3.0.0
 info:
   title: AI Icons API
-  version: 1.0.0
+  version: 2.0.0
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: ai_icons_session
+      x-yc-apigateway-authorizer:
+        type: function
+        function_id: ${function_id}
+        tag: "$latest"
+        authorizer_result_ttl_in_seconds: 60
 paths:
   /:
+    options:
+      x-yc-apigateway-integration:
+        type: dummy
+        http_code: 204
+        content:
+          '*': ''
+        http_headers:
+          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Credentials: 'true'
+          Access-Control-Allow-Headers: Content-Type
+          Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+      responses:
+        default:
+          description: CORS preflight
     x-yc-apigateway-any-method:
+      security:
+        - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
-        function_id: d4eieshbjp15jf8vh9p0
+        function_id: ${function_id}
         tag: "$latest"
         payload_format_version: "1.0"
       responses:
         default:
           description: Proxy response
+  /auth/login:
+    options:
+      x-yc-apigateway-integration:
+        type: dummy
+        http_code: 204
+        content:
+          '*': ''
+        http_headers:
+          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Credentials: 'true'
+          Access-Control-Allow-Headers: Content-Type
+          Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+      responses:
+        default:
+          description: CORS preflight
+    post:
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: ${function_id}
+        tag: "$latest"
+        payload_format_version: "1.0"
+      responses:
+        default:
+          description: Login response
   /{proxy+}:
     parameters:
       - name: proxy
@@ -20,10 +71,26 @@ paths:
         required: true
         schema:
           type: string
+    options:
+      x-yc-apigateway-integration:
+        type: dummy
+        http_code: 204
+        content:
+          '*': ''
+        http_headers:
+          Access-Control-Allow-Origin: ${app_origin}
+          Access-Control-Allow-Credentials: 'true'
+          Access-Control-Allow-Headers: Content-Type
+          Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS
+      responses:
+        default:
+          description: CORS preflight
     x-yc-apigateway-any-method:
+      security:
+        - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
-        function_id: d4eieshbjp15jf8vh9p0
+        function_id: ${function_id}
         tag: "$latest"
         payload_format_version: "1.0"
       responses:

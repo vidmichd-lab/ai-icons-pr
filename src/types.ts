@@ -16,6 +16,15 @@ export type EditableStylePayload = {
   previewUrl?: string
 }
 
+export type AuthRole = 'admin' | 'manager'
+
+export type AuthUser = {
+  id: string
+  login: string
+  name: string
+  role: AuthRole
+}
+
 export type GenerationStatus =
   | 'uploading'
   | 'backlogged'

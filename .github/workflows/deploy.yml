@@ -57,6 +57,10 @@ jobs:
 
       - name: Deploy backend function
         env:
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+          AUTH_BOOTSTRAP_LOGIN: ${{ vars.AUTH_BOOTSTRAP_LOGIN }}
+          AUTH_SESSION_COOKIE: ${{ vars.AUTH_SESSION_COOKIE }}
+          AUTH_BOOTSTRAP_PASSWORD: ${{ secrets.AUTH_BOOTSTRAP_PASSWORD }}
           KREA_API_TOKEN: ${{ secrets.KREA_API_TOKEN }}
           YC_BUCKET_NAME: ${{ vars.YC_BUCKET_NAME }}
           YC_FUNCTION_NAME: ${{ vars.YC_FUNCTION_NAME }}
@@ -64,7 +68,7 @@ jobs:
           YC_STORAGE_SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
           YC_STORAGE_PUBLIC_BASE_URL: ${{ vars.YC_STORAGE_PUBLIC_BASE_URL }}
         run: |
-          FUNCTION_ENV="KREA_API_TOKEN=$KREA_API_TOKEN,STORAGE_BUCKET=$YC_BUCKET_NAME,STORAGE_ACCESS_KEY=$YC_STORAGE_ACCESS_KEY,STORAGE_SECRET_KEY=$YC_STORAGE_SECRET_KEY,STORAGE_REGION=ru-central1,STORAGE_ENDPOINT=https://storage.yandexcloud.net,STORAGE_PUBLIC_BASE_URL=$YC_STORAGE_PUBLIC_BASE_URL"
+          FUNCTION_ENV="KREA_API_TOKEN=$KREA_API_TOKEN,STORAGE_BUCKET=$YC_BUCKET_NAME,STORAGE_ACCESS_KEY=$YC_STORAGE_ACCESS_KEY,STORAGE_SECRET_KEY=$YC_STORAGE_SECRET_KEY,STORAGE_REGION=ru-central1,STORAGE_ENDPOINT=https://storage.yandexcloud.net,STORAGE_PUBLIC_BASE_URL=$YC_STORAGE_PUBLIC_BASE_URL,APP_ORIGIN=$APP_ORIGIN,AUTH_SESSION_COOKIE=$AUTH_SESSION_COOKIE,AUTH_BOOTSTRAP_LOGIN=$AUTH_BOOTSTRAP_LOGIN,AUTH_BOOTSTRAP_PASSWORD=$AUTH_BOOTSTRAP_PASSWORD"
           yc serverless function version create \
             --function-name "$YC_FUNCTION_NAME" \
             --runtime nodejs22 \
@@ -74,6 +78,17 @@ jobs:
             --source-path functions/api/dist \
             --environment "$FUNCTION_ENV"
           yc serverless function allow-unauthenticated-invoke "$YC_FUNCTION_NAME"
+
+      - name: Update API gateway
+        env:
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+          YC_API_GATEWAY_NAME: ${{ vars.YC_API_GATEWAY_NAME }}
+          YC_FUNCTION_NAME: ${{ vars.YC_FUNCTION_NAME }}
+        run: |
+          FUNCTION_ID=$(yc serverless function get "$YC_FUNCTION_NAME" --format json | jq -r '.id')
+          yc serverless api-gateway update "$YC_API_GATEWAY_NAME" \
+            --spec deploy/api-gateway.yaml \
+            --variables function_id="$FUNCTION_ID",app_origin="$APP_ORIGIN"
 
       - name: Upload frontend bundle
         env:

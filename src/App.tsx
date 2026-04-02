@@ -24,10 +24,11 @@ import {
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { clearHistory, loadHistory, saveHistory } from '@/lib/history'
 import { cn } from '@/lib/utils'
 import type {
+  AuthUser,
   EditableStylePayload,
   GeneratedAsset,
   HistorySession,
@@ -77,6 +78,10 @@ const patchGeneration = (
 
 function App() {
   const [styles, setStyles] = useState<StylePreset[]>([])
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [login, setLogin] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoggingIn, startLogin] = useTransition()
   const [selectedStyleId, setSelectedStyleId] = useState<string>('')
   const [uploads, setUploads] = useState<SourceUpload[]>([])
   const [history, setHistory] = useState<HistorySession[]>(() => loadHistory())
@@ -94,17 +99,38 @@ function App() {
   const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
   const [previewAsset, setPreviewAsset] = useState<{ url: string; label: string } | null>(null)
 
+  const loadStyles = async () => {
+    setIsStylesLoading(true)
+
+    try {
+      const response = await api.getStyles()
+      setStyles(response.styles)
+      setSelectedStyleId((current) => current || response.styles[0]?.id || '')
+      setNotice('')
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setAuthUser(null)
+      } else {
+        setNotice(ensureErrorMessage(error))
+      }
+    } finally {
+      setIsStylesLoading(false)
+      setIsHydrated(true)
+    }
+  }
+
   useEffect(() => {
     void api
-      .getStyles()
-      .then((response) => {
-        setStyles(response.styles)
-        setSelectedStyleId((current) => current || response.styles[0]?.id || '')
+      .getMe()
+      .then(async (response) => {
+        setAuthUser(response.user)
+        await loadStyles()
       })
       .catch((error) => {
-        setNotice(ensureErrorMessage(error))
-      })
-      .finally(() => {
+        if (!(error instanceof ApiError && error.status === 401)) {
+          setNotice(ensureErrorMessage(error))
+        }
+
         setIsStylesLoading(false)
         setIsHydrated(true)
       })
@@ -159,6 +185,42 @@ function App() {
   const clearHistoryState = () => {
     clearHistory()
     setHistory([])
+  }
+
+  const handleLogin = () => {
+    if (!login.trim() || !password.trim()) {
+      setNotice('Введите логин и пароль.')
+      return
+    }
+
+    startLogin(async () => {
+      try {
+        const response = await api.login({
+          login: login.trim(),
+          password,
+        })
+
+        setAuthUser(response.user)
+        setPassword('')
+        setNotice('')
+        await loadStyles()
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
+    })
+  }
+
+  const handleLogout = () => {
+    void api
+      .logout()
+      .catch(() => undefined)
+      .finally(() => {
+        setAuthUser(null)
+        setStyles([])
+        setSelectedStyleId('')
+        setPassword('')
+        setNotice('')
+      })
   }
 
   const handleGenerate = () => {
@@ -425,7 +487,9 @@ function App() {
     setActiveDownloadId(fileName)
 
     try {
-      const response = await fetch(api.downloadUrl(url, fileName))
+      const response = await fetch(api.downloadUrl(url, fileName), {
+        credentials: 'include',
+      })
 
       if (!response.ok) {
         throw new Error('Не удалось скачать PNG')
@@ -473,7 +537,9 @@ function App() {
     try {
       const entries = await Promise.all(
         selected.map(async (entry, index) => {
-          const response = await fetch(api.downloadUrl(entry.url, entry.label))
+          const response = await fetch(api.downloadUrl(entry.url, entry.label), {
+            credentials: 'include',
+          })
 
           if (!response.ok) {
             throw new Error('Не удалось скачать один из результатов')
@@ -516,6 +582,58 @@ function App() {
 
     return count + (activeGeneration ? 1 : 0)
   }, 0)
+
+  if (!authUser) {
+    return (
+      <div className="mx-auto flex h-[100svh] w-full max-w-[560px] items-center justify-center p-4">
+        <Card className="w-full bg-card/90 backdrop-blur-sm">
+          <CardHeader className="gap-2 border-b">
+            <CardTitle className="text-lg">AI Icons</CardTitle>
+            <DialogDescription>
+              Вход для сотрудников, которым разрешен доступ к генерациям.
+            </DialogDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 pt-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-foreground">Логин</label>
+              <Input
+                autoComplete="username"
+                value={login}
+                onChange={(event) => setLogin(event.target.value)}
+                placeholder="manager"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-foreground">Пароль</label>
+              <Input
+                autoComplete="current-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    handleLogin()
+                  }
+                }}
+              />
+            </div>
+          </CardContent>
+          <CardFooter className="flex-col gap-3">
+            <Button className="w-full" onClick={handleLogin} disabled={isLoggingIn || isStylesLoading}>
+              {isLoggingIn || isStylesLoading ? (
+                <LoadingSpinner label="Входим…" size="sm" />
+              ) : (
+                'Войти'
+              )}
+            </Button>
+          </CardFooter>
+          {notice ? (
+            <div className="px-4 pb-4 text-sm text-destructive">{notice}</div>
+          ) : null}
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto flex h-[100svh] w-full max-w-[1480px] flex-col overflow-hidden p-3 md:p-4">
@@ -657,21 +775,26 @@ function App() {
               Результат
             </CardTitle>
             <CardAction className="self-center">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void downloadSelectedArchive()}
-                disabled={selectedCompletedCount === 0}
-              >
-                {isArchiveDownloading ? (
-                  <LoadingSpinner label="Собираем архив" size="sm" />
-                ) : (
-                  <>
-                    <DownloadIcon data-icon="inline-start" />
-                    Скачать архив
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={handleLogout}>
+                  Выйти
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void downloadSelectedArchive()}
+                  disabled={selectedCompletedCount === 0}
+                >
+                  {isArchiveDownloading ? (
+                    <LoadingSpinner label="Собираем архив" size="sm" />
+                  ) : (
+                    <>
+                      <DownloadIcon data-icon="inline-start" />
+                      Скачать архив
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardAction>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3">

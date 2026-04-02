@@ -1,4 +1,9 @@
-import type { EditableStylePayload, GenerationStatus, StylePreset } from '../types'
+import type {
+  AuthUser,
+  EditableStylePayload,
+  GenerationStatus,
+  StylePreset,
+} from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
@@ -8,12 +13,38 @@ type GenerationRequest = {
   seed: number
 }
 
+type LoginPayload = {
+  login: string
+  password: string
+}
+
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+const fetchApi = (path: string, init: RequestInit = {}) =>
+  fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(init.headers ?? {}),
+    },
+  })
+
 const ensureOk = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
       | { error?: string }
       | null
-    throw new Error(payload?.error ?? 'Request failed')
+
+    throw new ApiError(payload?.error ?? 'Request failed', response.status)
   }
 
   return (await response.json()) as T
@@ -46,9 +77,30 @@ export const api = {
     return `${API_BASE_URL}/download?${params.toString()}`
   },
 
+  async getMe() {
+    return ensureOk<{ user: AuthUser }>(await fetchApi('/auth/me', { cache: 'no-store' }))
+  },
+
+  async login(payload: LoginPayload) {
+    return ensureOk<{ user: AuthUser }>(
+      await fetchApi('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    )
+  },
+
+  async logout() {
+    return ensureOk<{ ok: true }>(
+      await fetchApi('/auth/logout', {
+        method: 'POST',
+      }),
+    )
+  },
+
   async getStyles() {
     return ensureOk<{ styles: StylePreset[] }>(
-      await fetch(`${API_BASE_URL}/styles`, {
+      await fetchApi('/styles', {
         cache: 'no-store',
       }),
     )
@@ -56,7 +108,7 @@ export const api = {
 
   async createStyle(payload: EditableStylePayload) {
     return ensureOk<StylePreset>(
-      await fetch(`${API_BASE_URL}/styles`, {
+      await fetchApi('/styles', {
         method: 'POST',
         body: createFormData(payload),
       }),
@@ -65,7 +117,7 @@ export const api = {
 
   async updateStyle(styleId: string, payload: EditableStylePayload) {
     return ensureOk<StylePreset>(
-      await fetch(`${API_BASE_URL}/styles/${styleId}`, {
+      await fetchApi(`/styles/${styleId}`, {
         method: 'PUT',
         body: createFormData(payload),
       }),
@@ -74,7 +126,7 @@ export const api = {
 
   async deleteStyle(styleId: string) {
     return ensureOk<{ ok: true }>(
-      await fetch(`${API_BASE_URL}/styles/${styleId}`, {
+      await fetchApi(`/styles/${styleId}`, {
         method: 'DELETE',
       }),
     )
@@ -85,7 +137,7 @@ export const api = {
     formData.set('file', file)
 
     return ensureOk<{ imageUrl: string }>(
-      await fetch(`${API_BASE_URL}/assets`, {
+      await fetchApi('/assets', {
         method: 'POST',
         body: formData,
       }),
@@ -94,20 +146,18 @@ export const api = {
 
   async createGeneration(payload: GenerationRequest) {
     return ensureOk<{ jobId: string; status: GenerationStatus }>(
-      await fetch(`${API_BASE_URL}/generations`, {
+      await fetchApi('/generations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(payload),
       }),
     )
   },
+
   async getJob(jobId: string) {
     return ensureOk<{
       status: GenerationStatus
       resultUrl?: string
       error?: string
-    }>(await fetch(`${API_BASE_URL}/jobs/${jobId}`))
+    }>(await fetchApi(`/jobs/${jobId}`))
   },
 }
