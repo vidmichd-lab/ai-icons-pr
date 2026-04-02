@@ -471,11 +471,12 @@ export const handler = async (event: HttpEvent) => {
 
       const job = await requestKreaJob('/generate/image/openai/gpt-image', {
         prompt:
-          'Isolate the centered icon only, remove the background completely, preserve shape, preserve color fidelity, clean edges, transparent background, premium product render.',
+          'Remove only the background and keep the exact same icon from the input image. Preserve the icon geometry, materials, colors, reflections, shadows on the object, framing, camera angle, scale, and all visible details. Do not redesign, restyle, or regenerate the icon. Output the same icon isolated on a fully transparent background with clean edges.',
         imageUrls: [payload.imageUrl],
         backgroundImage: 'transparent',
         width: 1024,
         height: 1024,
+        quality: 'high',
         batchSize: 1,
       })
 
