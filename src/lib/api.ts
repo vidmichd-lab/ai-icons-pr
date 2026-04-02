@@ -22,6 +22,7 @@ type LoginPayload = {
 type AdminCreateUserPayload = {
   login: string
   name: string
+  quotaLimit?: number
 }
 
 export class ApiError extends Error {
@@ -184,6 +185,15 @@ export const api = {
     return ensureOk<{ ok: true }>(
       await fetchApi(`/admin/users/${encodeURIComponent(login)}`, {
         method: 'DELETE',
+      }),
+    )
+  },
+
+  async updateAdminUserQuota(login: string, quotaLimit: number | null) {
+    return ensureOk<{ user: ManagedUser }>(
+      await fetchApi(`/admin/users/${encodeURIComponent(login)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ quotaLimit }),
       }),
     )
   },

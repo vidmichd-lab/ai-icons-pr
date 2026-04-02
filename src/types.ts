@@ -19,9 +19,9 @@ export type EditableStylePayload = {
 export type AuthRole = 'admin' | 'manager'
 
 export type GenerationQuota = {
-  limit: number
+  limit: number | null
   used: number
-  remaining: number
+  remaining: number | null
   period: string
 }
 

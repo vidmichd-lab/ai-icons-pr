@@ -110,7 +110,11 @@ function App() {
   const [isAdminBusy, startAdminMutation] = useTransition()
 
   const isRootAdmin = authUser?.login === 'vidmich'
-  const quotaLabel = authUser ? `${authUser.quota.remaining}/${authUser.quota.limit}` : null
+  const quotaLabel = authUser
+    ? authUser.quota.limit === null
+      ? '∞'
+      : `${authUser.quota.remaining}/${authUser.quota.limit}`
+    : null
 
   const loadStyles = async () => {
     setIsStylesLoading(true)
@@ -573,7 +577,7 @@ function App() {
     })
   }
 
-  const createManagedUser = (payload: { login: string; name: string }) => {
+  const createManagedUser = (payload: { login: string; name: string; quotaLimit: number }) => {
     startAdminMutation(async () => {
       try {
         const response = await api.createAdminUser(payload)
@@ -598,6 +602,20 @@ function App() {
       try {
         await api.deleteAdminUser(login)
         setManagedUsers((current) => current.filter((user) => user.login !== login))
+        setNotice('')
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
+    })
+  }
+
+  const updateManagedUserQuota = (login: string, quotaLimit: number | null) => {
+    startAdminMutation(async () => {
+      try {
+        const response = await api.updateAdminUserQuota(login, quotaLimit)
+        setManagedUsers((current) =>
+          current.map((user) => (user.login === login ? response.user : user)),
+        )
         setNotice('')
       } catch (error) {
         setNotice(ensureErrorMessage(error))
@@ -1122,6 +1140,7 @@ function App() {
         }}
         onCreateUser={createManagedUser}
         onDeleteUser={deleteManagedUser}
+        onUpdateQuota={updateManagedUserQuota}
         open={isAdminPanelOpen}
         users={managedUsers}
       />
@@ -1153,8 +1172,9 @@ type AdminPanelProps = {
   generatedCredentials: { login: string; password: string } | null
   loading: boolean
   onClose: () => void
-  onCreateUser: (payload: { login: string; name: string }) => void
+  onCreateUser: (payload: { login: string; name: string; quotaLimit: number }) => void
   onDeleteUser: (login: string) => void
+  onUpdateQuota: (login: string, quotaLimit: number | null) => void
   open: boolean
   users: ManagedUser[]
 }
@@ -1166,11 +1186,13 @@ function AdminPanel({
   onClose,
   onCreateUser,
   onDeleteUser,
+  onUpdateQuota,
   open,
   users,
 }: AdminPanelProps) {
   const [login, setLogin] = useState('')
   const [name, setName] = useState('')
+  const [quotaLimit, setQuotaLimit] = useState('100')
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
@@ -1201,14 +1223,24 @@ function AdminPanel({
                   placeholder="Менеджер"
                 />
               </div>
+              <div className="grid gap-2 md:col-span-2">
+                <label className="text-sm font-medium text-foreground">Лимит в месяц</label>
+                <Input
+                  inputMode="numeric"
+                  value={quotaLimit}
+                  onChange={(event) => setQuotaLimit(event.target.value.replace(/[^\d]/g, ''))}
+                  placeholder="100"
+                />
+              </div>
             </div>
             <Button
               className="w-full md:w-auto"
-              disabled={busy || !login.trim() || !name.trim()}
+              disabled={busy || !login.trim() || !name.trim() || !Number(quotaLimit)}
               onClick={() => {
-                onCreateUser({ login: login.trim(), name: name.trim() })
+                onCreateUser({ login: login.trim(), name: name.trim(), quotaLimit: Number(quotaLimit) || 100 })
                 setLogin('')
                 setName('')
+                setQuotaLimit('100')
               }}
             >
               {busy ? <LoadingSpinner label="Создаем пользователя" size="sm" /> : 'Сгенерировать доступ'}
@@ -1252,9 +1284,24 @@ function AdminPanel({
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-xs font-medium text-foreground">{user.quota.remaining}/{user.quota.limit}</div>
+                          <div className="text-xs font-medium text-foreground">
+                            {user.quota.limit === null ? '∞' : `${user.quota.remaining}/${user.quota.limit}`}
+                          </div>
                           <div className="text-[11px] text-muted-foreground">{user.role}</div>
                         </div>
+                        {user.login !== 'vidmich' ? (
+                          <Input
+                            className="h-8 w-20"
+                            inputMode="numeric"
+                            defaultValue={String(user.quota.limit ?? 100)}
+                            onBlur={(event) => {
+                              const nextLimit = Number(event.target.value.replace(/[^\d]/g, '')) || 100
+                              if (nextLimit !== user.quota.limit) {
+                                onUpdateQuota(user.login, nextLimit)
+                              }
+                            }}
+                          />
+                        ) : null}
                         {user.login !== 'vidmich' ? (
                           <Button
                             size="xs"

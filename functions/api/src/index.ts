@@ -50,6 +50,7 @@ type StoredUser = {
   login: string
   name: string
   role: AuthRole
+  quotaLimit?: number | null
   passwordHash: string
   passwordSalt: string
   disabled: boolean
@@ -72,9 +73,9 @@ type UsageManifest = {
 }
 
 type GenerationQuota = {
-  limit: number
+  limit: number | null
   used: number
-  remaining: number
+  remaining: number | null
   period: string
 }
 
@@ -155,7 +156,7 @@ const usersManifestKey = 'auth/users.json'
 const sessionsPrefix = 'auth/sessions'
 const usagePrefix = 'auth/usage'
 const sessionTtlMs = 1000 * 60 * 60 * 24 * 7
-const monthlyGenerationLimit = 100
+const defaultMonthlyGenerationLimit = 100
 const rootAdminLogin = 'vidmich'
 
 const generationSchema = z.object({
@@ -328,14 +329,20 @@ const currentUsagePeriod = () => new Date().toISOString().slice(0, 7)
 
 const usageObjectKey = (period: string) => `${usagePrefix}/${period}.json`
 
-const buildQuota = (used: number, period = currentUsagePeriod()): GenerationQuota => ({
-  limit: monthlyGenerationLimit,
+const isRootAdmin = (user: StoredUser) => user.login === rootAdminLogin
+
+const userQuotaLimit = (user: StoredUser) => (isRootAdmin(user) ? null : user.quotaLimit ?? defaultMonthlyGenerationLimit)
+
+const buildQuota = (
+  used: number,
+  period = currentUsagePeriod(),
+  limit: number | null = defaultMonthlyGenerationLimit,
+): GenerationQuota => ({
+  limit,
   used,
-  remaining: Math.max(monthlyGenerationLimit - used, 0),
+  remaining: limit === null ? null : Math.max(limit - used, 0),
   period,
 })
-
-const isRootAdmin = (user: StoredUser) => user.login === rootAdminLogin
 
 const randomPassword = (length = 24) => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
@@ -382,6 +389,7 @@ const readUsers = async (): Promise<StoredUser[]> => {
         login: z.string(),
         name: z.string(),
         role: z.enum(['admin', 'manager']),
+        quotaLimit: z.number().int().positive().nullable().optional(),
         passwordHash: z.string(),
         passwordSalt: z.string(),
         disabled: z.boolean(),
@@ -401,6 +409,7 @@ const readUsers = async (): Promise<StoredUser[]> => {
         login: env.AUTH_BOOTSTRAP_LOGIN,
         name: 'Admin',
         role: 'admin',
+        quotaLimit: null,
         passwordHash: hashPassword(env.AUTH_BOOTSTRAP_PASSWORD, salt),
         passwordSalt: salt,
         disabled: false,
@@ -444,17 +453,19 @@ const writeUsage = async (usage: UsageManifest) => {
 
 const getUserQuota = async (user: StoredUser) => {
   const usage = await readUsage()
-  return buildQuota(usage.users[user.login] ?? 0, usage.period)
+  const limit = userQuotaLimit(user)
+  return buildQuota(usage.users[user.login] ?? 0, usage.period, limit)
 }
 
 const reserveGenerationQuota = async (user: StoredUser) => {
   const usage = await readUsage()
   const used = usage.users[user.login] ?? 0
+  const limit = userQuotaLimit(user)
 
-  if (used >= monthlyGenerationLimit) {
+  if (limit !== null && used >= limit) {
     return {
       ok: false as const,
-      quota: buildQuota(used, usage.period),
+      quota: buildQuota(used, usage.period, limit),
     }
   }
 
@@ -470,7 +481,7 @@ const reserveGenerationQuota = async (user: StoredUser) => {
 
   return {
     ok: true as const,
-    quota: buildQuota(used + 1, usage.period),
+    quota: buildQuota(used + 1, usage.period, limit),
   }
 }
 
@@ -1089,6 +1100,7 @@ const appHandler = async (event: HttpEvent) => {
       const payload = z.object({
         login: z.string().min(3).max(64).regex(/^[a-z0-9._-]+$/),
         name: z.string().min(1).max(120),
+        quotaLimit: z.number().int().positive().max(10000).optional(),
       }).parse(await request.json())
 
       const login = normalizeLogin(payload.login)
@@ -1106,6 +1118,7 @@ const appHandler = async (event: HttpEvent) => {
         login,
         name: payload.name.trim(),
         role: 'manager',
+        quotaLimit: payload.quotaLimit ?? defaultMonthlyGenerationLimit,
         passwordHash: hashPassword(password, salt),
         passwordSalt: salt,
         disabled: false,
@@ -1118,6 +1131,35 @@ const appHandler = async (event: HttpEvent) => {
       return response(200, {
         user: await toManagedUser(nextUser),
         password,
+      })
+    }
+
+    if (event.httpMethod === 'PUT' && path.startsWith('/admin/users/')) {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
+      const login = normalizeLogin(decodeURIComponent(path.split('/').pop() ?? ''))
+      const payload = z.object({
+        quotaLimit: z.number().int().positive().max(10000).nullable(),
+      }).parse(await request.json())
+      const users = await readUsers()
+      const existing = users.find((user) => user.login === login)
+
+      if (!existing) {
+        return response(404, { error: 'Пользователь не найден' })
+      }
+
+      const nextUser: StoredUser = {
+        ...existing,
+        quotaLimit: login === rootAdminLogin ? null : payload.quotaLimit ?? defaultMonthlyGenerationLimit,
+        updatedAt: new Date().toISOString(),
+      }
+
+      await writeUsers(users.map((user) => (user.login === login ? nextUser : user)))
+
+      return response(200, {
+        user: await toManagedUser(nextUser),
       })
     }
 
