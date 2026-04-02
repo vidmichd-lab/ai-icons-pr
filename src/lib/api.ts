@@ -162,7 +162,7 @@ export const api = {
   async getJob(jobId: string) {
     return ensureOk<{
       status: GenerationStatus
-      resultUrl?: string
+      resultUrls?: string[]
       error?: string
     }>(await fetchApi(`/jobs/${jobId}`))
   },

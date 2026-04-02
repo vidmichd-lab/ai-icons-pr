@@ -409,15 +409,44 @@ function App() {
 
     const response = await api.getJob(jobId)
 
-    if (response.status === 'completed' && response.resultUrl) {
+    if (response.status === 'completed' && response.resultUrls?.length) {
       setHistory((current) =>
-        updateSession(current, sessionId, (session) =>
-          patchGeneration(session, generationId, (generation) => ({
-            ...generation,
-            status: 'completed',
-            resultUrl: response.resultUrl,
-          })),
-        ),
+        updateSession(current, sessionId, (session) => {
+          const completedAt = new Date().toISOString()
+          const resultUrls = response.resultUrls ?? []
+          const [firstUrl, ...restUrls] = resultUrls
+
+          const nextGenerations = session.generations.flatMap((generation) => {
+            if (generation.id !== generationId) {
+              return [generation]
+            }
+
+            const primaryGeneration: GeneratedAsset = {
+              ...generation,
+              status: 'completed',
+              resultUrl: firstUrl,
+            }
+
+            const extraGenerations = restUrls.map((url, index) => ({
+              id: `${generation.id}-${index + 2}`,
+              kind: 'styled' as const,
+              label: `${generation.label} · ${index + 2}`,
+              seed: generation.seed,
+              status: 'completed' as const,
+              jobId: generation.jobId,
+              resultUrl: url,
+              createdAt: completedAt,
+            }))
+
+            return [primaryGeneration, ...extraGenerations]
+          })
+
+          return {
+            ...session,
+            activeGenerationId: generationId,
+            generations: nextGenerations,
+          }
+        }),
       )
       return
     }
