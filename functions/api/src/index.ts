@@ -107,10 +107,6 @@ const generationSchema = z.object({
   seed: z.number().int().nonnegative(),
 })
 
-const cutoutSchema = z.object({
-  imageUrl: z.url(),
-})
-
 const envSchema = z.object({
   KREA_API_TOKEN: z.string().min(1),
   STORAGE_BUCKET: z.string().min(1),
@@ -550,23 +546,6 @@ export const handler = async (event: HttpEvent) => {
         prompt: style.prompt,
         imageUrl: payload.imageUrl,
         seed: payload.seed,
-        batchSize: 1,
-      })
-
-      return response(200, job)
-    }
-
-    if (event.httpMethod === 'POST' && path === '/cutout') {
-      const payload = cutoutSchema.parse(await request.json())
-
-      const job = await requestKreaJob('/generate/image/openai/gpt-image', {
-        prompt:
-          'Remove only the background and keep the exact same icon from the input image. Preserve the icon geometry, materials, colors, reflections, shadows on the object, framing, camera angle, scale, and all visible details. Do not redesign, restyle, or regenerate the icon. Output the same icon isolated on a fully transparent background with clean edges.',
-        imageUrls: [payload.imageUrl],
-        backgroundImage: 'transparent',
-        width: 1024,
-        height: 1024,
-        quality: 'high',
         batchSize: 1,
       })
 

@@ -30,14 +30,13 @@ export type GenerationStatus =
 
 export type GeneratedAsset = {
   id: string
-  kind: 'styled' | 'cutout'
+  kind: 'styled'
   label: string
   seed?: number
   status: GenerationStatus
   jobId: string
   resultUrl?: string
   error?: string
-  sourceGenerationId?: string
   createdAt: string
 }
 

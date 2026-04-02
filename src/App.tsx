@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { DownloadIcon, PaintBucketIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
+import { DownloadIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
 import { zipSync, strToU8 } from 'fflate'
 
 import { Button } from '@/components/ui/button'
@@ -43,21 +43,6 @@ const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 
 const ensureErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Что-то пошло не так'
-
-const blobToDataUrl = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
-      }
-
-      reject(new Error('Не удалось подготовить PNG'))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('Не удалось прочитать PNG'))
-    reader.readAsDataURL(blob)
-  })
 
 const updateSession = (
   sessions: HistorySession[],
@@ -338,80 +323,6 @@ function App() {
         )
 
         void pollJob(session.id, generationId, response.jobId)
-      } catch (error) {
-        setHistory((current) =>
-          updateSession(current, session.id, (item) =>
-            patchGeneration(item, generationId, (generation) => ({
-              ...generation,
-              status: 'failed',
-              error: ensureErrorMessage(error),
-            })),
-          ),
-        )
-      }
-    })
-  }
-
-  const removeBackground = (session: HistorySession) => {
-    const selectedGeneration = session.generations.find(
-      (generation) => generation.id === session.activeGenerationId,
-    )
-
-    if (!selectedGeneration?.resultUrl) {
-      setNotice('Сначала выберите готовую генерацию.')
-      return
-    }
-
-    const generationId = crypto.randomUUID()
-
-    setHistory((current) =>
-      updateSession(current, session.id, (item) => ({
-        ...item,
-        activeGenerationId: generationId,
-        generations: [
-          {
-            id: generationId,
-            kind: 'cutout',
-            label: `Cutout ${item.generations.filter((entry) => entry.kind === 'cutout').length + 1}`,
-            status: 'queued',
-            sourceGenerationId: selectedGeneration.id,
-            jobId: '',
-            createdAt: new Date().toISOString(),
-          },
-          ...item.generations,
-        ],
-      })),
-    )
-
-    startGenerating(async () => {
-      try {
-        setHistory((current) =>
-          updateSession(current, session.id, (item) =>
-            patchGeneration(item, generationId, (generation) => ({
-              ...generation,
-              status: 'processing',
-            })),
-          ),
-        )
-
-        const { removeBackground } = await import('@imgly/background-removal')
-        const blob = await removeBackground(selectedGeneration.resultUrl!, {
-          output: {
-            format: 'image/png',
-            quality: 1,
-          },
-        })
-        const resultUrl = await blobToDataUrl(blob)
-
-        setHistory((current) =>
-          updateSession(current, session.id, (item) =>
-            patchGeneration(item, generationId, (generation) => ({
-              ...generation,
-              status: 'completed',
-              resultUrl,
-            })),
-          ),
-        )
       } catch (error) {
         setHistory((current) =>
           updateSession(current, session.id, (item) =>
@@ -782,10 +693,6 @@ function App() {
                         <Button size="sm" variant="outline" onClick={() => reroll(session)}>
                           <RefreshCcwIcon data-icon="inline-start" />
                           Новый seed
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => removeBackground(session)}>
-                          <PaintBucketIcon data-icon="inline-start" />
-                          Обтравить
                         </Button>
                       </CardFooter>
                     </Card>
