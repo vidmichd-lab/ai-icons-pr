@@ -8,6 +8,7 @@
 - SPA без SSR
 - UI слой на `shadcn/ui`
 - клиент хранит историю в `localStorage`
+- превью исходников в истории сохраняются как data URL, чтобы переживать reload браузера
 
 ### Backend
 
@@ -15,6 +16,7 @@
 - HTTP доступ через `Yandex API Gateway`
 - backend инкапсулирует работу с `Krea API`
 - `KREA_API_TOKEN` никогда не уходит в браузер
+- download proxy принимает только безопасные `https` URL и режет локальные/private адреса
 
 ### Storage
 
@@ -29,11 +31,12 @@
 ### Генерация
 
 1. пользователь загружает локальный файл
-2. frontend отправляет файл в backend
-3. backend загружает asset в `Krea`
-4. backend создает job генерации
-5. frontend поллит статус job
-6. по завершении frontend сохраняет result URL в историю
+2. frontend сохраняет локальное preview как data URL для устойчивой истории
+3. frontend отправляет файл в backend
+4. backend загружает asset в `Krea`
+5. backend создает job генерации
+6. frontend поллит статус job
+7. по завершении frontend сохраняет result URL в историю
 
 ### Стили
 
@@ -46,5 +49,7 @@
 ## Важные технические решения
 
 - история хранится локально, потому что это дешевле и проще на старте
+- blob URL не используются для persisted history, потому что они умирают после reload
 - превью результата используется по URL из `Krea`, а скачивание идет через backend proxy, чтобы обойти CORS
+- backend proxy дополнительно ограничен по безопасным remote host'ам, чтобы не превращаться в открытый fetch endpoint
 - backend и frontend деплоятся независимо, но из одного GitHub Actions workflow

@@ -2,10 +2,11 @@
 
 ## Production окружение
 
-- bucket: `ai-icons-pr-vidmichd-lab`
+- bucket: `ai-icons-practicum`
 - function: `ai-icons-api`
 - API Gateway: `https://d5dmcsqng37bo4fjsrks.akta928u.apigw.yandexcloud.net`
-- production frontend: `https://storage.yandexcloud.net/ai-icons-pr-vidmichd-lab/index.html`
+- production frontend: `https://ai-icons-practicum.website.yandexcloud.net/`
+- storage public base URL for backend assets: `https://storage.yandexcloud.net/ai-icons-practicum`
 
 ## Что деплоится
 

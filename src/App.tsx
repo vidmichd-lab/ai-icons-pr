@@ -43,6 +43,15 @@ const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 const ensureErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Что-то пошло не так'
 
+const readFileAsDataUrl = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error ?? new Error('Не удалось прочитать файл'))
+    reader.readAsDataURL(file)
+  })
+
 const isPendingStatus = (status?: GeneratedAsset['status']) =>
   status !== 'completed' && status !== 'failed' && status !== 'cancelled'
 
@@ -111,17 +120,25 @@ function App() {
   )
 
   const onDrop = (acceptedFiles: File[]) => {
-    setUploads((current) => {
-      const freeSlots = Math.max(MAX_FILES - current.length, 0)
-      const nextUploads = acceptedFiles.slice(0, freeSlots).map((file) => ({
-        id: crypto.randomUUID(),
-        file,
-        name: file.name,
-        previewUrl: URL.createObjectURL(file),
-      }))
+    void (async () => {
+      const freeSlots = Math.max(MAX_FILES - uploads.length, 0)
+      const files = acceptedFiles.slice(0, freeSlots)
 
-      return [...current, ...nextUploads]
-    })
+      try {
+        const nextUploads = await Promise.all(
+          files.map(async (file) => ({
+            id: crypto.randomUUID(),
+            file,
+            name: file.name,
+            previewUrl: await readFileAsDataUrl(file),
+          })),
+        )
+
+        setUploads((current) => [...current, ...nextUploads])
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
+    })()
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -364,28 +381,43 @@ function App() {
 
   const upsertStyle = (payload: EditableStylePayload) => {
     startStylesMutation(async () => {
-      const nextStyle = payload.id
-        ? await api.updateStyle(payload.id, payload)
-        : await api.createStyle(payload)
+      try {
+        const nextStyle = payload.id
+          ? await api.updateStyle(payload.id, payload)
+          : await api.createStyle(payload)
 
-      setStyles((current) => {
-        const withoutCurrent = current.filter((style) => style.id !== nextStyle.id)
-        return [nextStyle, ...withoutCurrent]
-      })
+        setStyles((current) => {
+          const withoutCurrent = current.filter((style) => style.id !== nextStyle.id)
+          return [nextStyle, ...withoutCurrent]
+        })
 
-      setSelectedStyleId(nextStyle.id)
-      setIsEditorOpen(false)
-      setEditingStyle(null)
+        setSelectedStyleId(nextStyle.id)
+        setIsEditorOpen(false)
+        setEditingStyle(null)
+        setNotice('')
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
     })
   }
 
   const removeStyle = (styleId: string) => {
     startStylesMutation(async () => {
-      await api.deleteStyle(styleId)
-      setStyles((current) => current.filter((style) => style.id !== styleId))
-      setSelectedStyleId((current) =>
-        current === styleId ? styles.find((style) => style.id !== styleId)?.id ?? '' : current,
-      )
+      try {
+        await api.deleteStyle(styleId)
+
+        setStyles((current) => {
+          const nextStyles = current.filter((style) => style.id !== styleId)
+          setSelectedStyleId((currentSelected) =>
+            currentSelected === styleId ? nextStyles[0]?.id ?? '' : currentSelected,
+          )
+          return nextStyles
+        })
+
+        setNotice('')
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
     })
   }
 

@@ -1,3 +1,5 @@
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -408,8 +410,49 @@ const getJob = async (jobId: string) => {
 const downloadRemoteAsset = async (assetUrl: string) => {
   const target = new URL(assetUrl)
 
-  if (target.protocol !== 'https:') {
-    throw new Error('Only https download URLs are allowed')
+  if (target.protocol !== 'https:' || target.username || target.password) {
+    throw new Error('Only safe https download URLs are allowed')
+  }
+
+  const hostname = target.hostname.toLowerCase()
+
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.localhost')
+  ) {
+    throw new Error('Local download URLs are not allowed')
+  }
+
+  const privateRanges = [
+    /^10\./,
+    /^127\./,
+    /^169\.254\./,
+    /^172\.(1[6-9]|2\d|3[0-1])\./,
+    /^192\.168\./,
+  ]
+
+  const isBlockedAddress = (value: string) => {
+    if (value === '::1' || value.toLowerCase().startsWith('fe80:') || value.toLowerCase().startsWith('fc') || value.toLowerCase().startsWith('fd')) {
+      return true
+    }
+
+    if (isIP(value) !== 4) {
+      return false
+    }
+
+    return privateRanges.some((pattern) => pattern.test(value))
+  }
+
+  if (isIP(hostname) && isBlockedAddress(hostname)) {
+    throw new Error('Private download URLs are not allowed')
+  }
+
+  const resolved = await lookup(hostname, { all: true })
+
+  if (resolved.length === 0 || resolved.some((entry) => isBlockedAddress(entry.address))) {
+    throw new Error('Resolved download host is not allowed')
   }
 
   const result = await fetch(target)
