@@ -99,9 +99,7 @@
 
   body {
     @apply antialiased bg-background text-foreground;
-    background:
-      radial-gradient(circle at top left, rgba(255, 212, 79, 0.28), transparent 28%),
-      linear-gradient(180deg, #fffce9 0%, #f5f4ed 52%, #efede5 100%);
+    background: linear-gradient(180deg, #f6f6f4 0%, #efefec 100%);
   }
 
   button,

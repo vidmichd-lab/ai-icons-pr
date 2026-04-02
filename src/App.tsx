@@ -527,9 +527,9 @@ function App() {
     ).length
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col p-4 md:p-6">
-      <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
-        <Card className="bg-card/85 backdrop-blur-sm">
+    <div className="mx-auto flex h-[100svh] w-full max-w-[1480px] flex-col overflow-hidden p-3 md:p-4">
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
+        <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">1</Badge>
@@ -537,7 +537,7 @@ function App() {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
-            <ScrollArea className="h-[calc(100vh-13rem)] pr-2">
+            <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="flex flex-col gap-2">
                 {styles.map((style) => (
                   <button
@@ -581,7 +581,7 @@ function App() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/85 backdrop-blur-sm">
+        <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">2</Badge>
@@ -602,7 +602,7 @@ function App() {
               <p className="mt-1 text-xs text-muted-foreground">PNG, JPG или WebP</p>
             </div>
 
-            <ScrollArea className="h-[calc(100vh-22rem)] pr-2">
+            <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="grid gap-2">
                 {uploads.map((upload) => (
                   <div
@@ -639,7 +639,7 @@ function App() {
           </CardFooter>
         </Card>
 
-        <Card className="bg-card/85 backdrop-blur-sm">
+        <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">3</Badge>
@@ -652,21 +652,28 @@ function App() {
               </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="px-3">
-            <ScrollArea className="h-[calc(100vh-12rem)] pr-2">
+          <CardContent className="min-h-0 flex-1 px-3">
+            <ScrollArea className="h-full pr-2">
               <div className="flex flex-col gap-3">
                 {history.map((session) => {
                   const activeGeneration =
                     session.generations.find(
                       (generation) => generation.id === session.activeGenerationId,
                     ) ?? session.generations[0]
+                  const previewGeneration =
+                    session.generations.find(
+                      (generation) =>
+                        generation.id === session.activeGenerationId && generation.resultUrl,
+                    ) ??
+                    session.generations.find((generation) => generation.resultUrl) ??
+                    activeGeneration
 
                   return (
                     <Card key={session.id} size="sm" className="bg-background/85 py-3">
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
                           <img
-                            src={activeGeneration?.resultUrl ?? session.sourcePreviewUrl}
+                            src={previewGeneration?.resultUrl ?? session.sourcePreviewUrl}
                             alt={session.sourceName}
                             className="size-24 rounded-lg object-cover"
                           />
