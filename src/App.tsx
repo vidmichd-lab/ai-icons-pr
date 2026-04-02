@@ -489,7 +489,7 @@ function App() {
     <div className="mx-auto flex h-[100svh] w-full max-w-[1480px] flex-col overflow-hidden p-3 md:p-4">
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="border-b">
+          <CardHeader className="min-h-16 border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">1</Badge>
               Стиль
@@ -547,7 +547,7 @@ function App() {
         </Card>
 
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="border-b">
+          <CardHeader className="min-h-16 border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">2</Badge>
               Загрузка
@@ -606,7 +606,7 @@ function App() {
         </Card>
 
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="border-b">
+          <CardHeader className="min-h-16 border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">3</Badge>
               Результат
@@ -768,7 +768,7 @@ function App() {
                 })}
               </div>
             </ScrollArea>
-            <div className="border-t pt-3 pb-3">
+            <div className="border-t pt-4 pb-4">
               <Button
                 className="w-full"
                 variant="outline"
