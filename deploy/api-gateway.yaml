@@ -8,7 +8,6 @@ x-yc-apigateway:
       default: "d4eieshbjp15jf8vh9p0"
     app_origin:
       default: "https://ai-icons-practicum.website.yandexcloud.net"
-components:
 paths:
   /:
     options:
