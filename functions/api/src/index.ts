@@ -761,7 +761,7 @@ const getJob = async (jobId: string) => {
   return {
     status: data.status,
     error: data.error,
-    resultUrls: data.result?.urls ?? [],
+    resultUrl: data.result?.urls?.[0],
   }
 }
 
@@ -1185,7 +1185,7 @@ const appHandler = async (event: HttpEvent) => {
         prompt: style.prompt,
         imageUrl: payload.imageUrl,
         seed: payload.seed,
-        batchSize: 4,
+        batchSize: 1,
       })
 
       return response(200, {
