@@ -84,6 +84,7 @@ function App() {
   const [isStylesUnlocked, setIsStylesUnlocked] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
+  const [previewAsset, setPreviewAsset] = useState<{ url: string; label: string } | null>(null)
 
   useEffect(() => {
     void api
@@ -510,7 +511,8 @@ function App() {
                       onClick={() => setSelectedStyleId(style.id)}
                       className={cn(
                         'flex w-full items-center gap-3 rounded-xl border border-border bg-background/80 p-2 text-left transition hover:bg-muted/70',
-                        style.id === selectedStyleId && 'border-secondary bg-accent/70 ring-1 ring-secondary/40',
+                        style.id === selectedStyleId &&
+                          'border-secondary bg-accent ring-2 ring-secondary shadow-[0_0_0_1px_hsl(var(--secondary))]',
                       )}
                     >
                       <img
@@ -637,15 +639,6 @@ function App() {
                     session.generations.find(
                       (generation) => generation.id === session.activeGenerationId,
                     ) ?? session.generations[0]
-                  const previewGeneration =
-                    session.generations.find(
-                      (generation) =>
-                        generation.id === session.activeGenerationId && generation.resultUrl,
-                    ) ??
-                    session.generations.find((generation) => generation.resultUrl) ??
-                    activeGeneration
-                  const previewUrl = previewGeneration?.resultUrl || session.sourcePreviewUrl
-
                   return (
                     <Card
                       key={session.id}
@@ -655,8 +648,7 @@ function App() {
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
                           <img
-                            key={previewUrl}
-                            src={previewUrl}
+                            src={session.sourcePreviewUrl}
                             alt={session.sourceName}
                             className="size-24 rounded-lg object-cover"
                           />
@@ -665,6 +657,7 @@ function App() {
                               {session.sourceName}
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">{session.styleName}</p>
+                            <p className="mt-1 text-xs font-medium text-foreground/70">Исходник</p>
                             <p className="mt-2 text-xs text-muted-foreground">
                               {activeGeneration?.error ? (
                                 activeGeneration.error
@@ -688,41 +681,28 @@ function App() {
                               className={cn(
                                 'rounded-xl border border-border bg-muted/30 p-2 text-left transition hover:bg-muted/60',
                                 generation.id === session.activeGenerationId &&
-                                  'border-secondary bg-accent/70 ring-1 ring-secondary/40',
+                                  'border-secondary bg-accent ring-2 ring-secondary shadow-[0_0_0_1px_hsl(var(--secondary))]',
                               )}
                             >
                               <div className="relative mb-2 overflow-hidden rounded-lg bg-background">
-                                {generation.resultUrl ? (
-                                  <Button
-                                    size="icon-xs"
-                                    variant="secondary"
-                                    className="absolute top-1 right-1 z-10"
-                                    onClick={() =>
-                                      void downloadPng(
-                                        generation.resultUrl!,
-                                        `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png`,
-                                      )
-                                    }
-                                  >
-                                    {activeDownloadId === `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png` ? (
-                                      <LoaderCircleIcon className="animate-spin" />
-                                    ) : (
-                                      <DownloadIcon />
-                                    )}
-                                    <span className="sr-only">Скачать PNG</span>
-                                  </Button>
-                                ) : null}
                                 <button
                                   type="button"
                                   className="block w-full"
-                                  onClick={() =>
+                                  onClick={() => {
                                     setHistory((current) =>
                                       updateSession(current, session.id, (item) => ({
                                         ...item,
                                         activeGenerationId: generation.id,
                                       })),
                                     )
-                                  }
+
+                                    if (generation.resultUrl) {
+                                      setPreviewAsset({
+                                        url: generation.resultUrl,
+                                        label: `${session.sourceName} · ${generation.label}`,
+                                      })
+                                    }
+                                  }}
                                 >
                                   {generation.resultUrl ? (
                                     <img
@@ -753,6 +733,28 @@ function App() {
                                   {generation.label}
                                 </div>
                               </button>
+                              {generation.resultUrl ? (
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className="mt-2 w-full"
+                                  onClick={() =>
+                                    void downloadPng(
+                                      generation.resultUrl!,
+                                      `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png`,
+                                    )
+                                  }
+                                >
+                                  {activeDownloadId === `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png` ? (
+                                    <LoaderCircleIcon className="animate-spin" />
+                                  ) : (
+                                    <>
+                                      <DownloadIcon data-icon="inline-start" />
+                                      Скачать
+                                    </>
+                                  )}
+                                </Button>
+                              ) : null}
                             </div>
                           ))}
                         </div>
@@ -824,6 +826,25 @@ function App() {
           setPendingStyleAction(null)
         }}
       />
+
+      <Dialog open={Boolean(previewAsset)} onOpenChange={(open) => !open && setPreviewAsset(null)}>
+        <DialogContent className="max-w-4xl p-3 sm:p-4">
+          {previewAsset ? (
+            <div className="flex flex-col gap-3">
+              <DialogHeader>
+                <DialogTitle className="truncate pr-8 text-sm">{previewAsset.label}</DialogTitle>
+              </DialogHeader>
+              <div className="overflow-hidden rounded-xl bg-background">
+                <img
+                  src={previewAsset.url}
+                  alt={previewAsset.label}
+                  className="max-h-[80svh] w-full object-contain"
+                />
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
