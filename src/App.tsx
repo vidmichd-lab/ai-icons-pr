@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { DownloadIcon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
-import { zipSync, strToU8 } from 'fflate'
+import { zipSync } from 'fflate'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -453,9 +453,7 @@ function App() {
         }),
       )
 
-      const archiveEntries: Record<string, Uint8Array> = {
-        'README.txt': strToU8('Selected generations from AI Icons Studio') as Uint8Array,
-      }
+      const archiveEntries: Record<string, Uint8Array> = {}
 
       for (const [fileName, bytes] of entries) {
         archiveEntries[fileName] = bytes as Uint8Array
