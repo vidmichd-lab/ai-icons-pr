@@ -495,8 +495,8 @@ function App() {
               Стиль
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
-            <ScrollArea className="min-h-0 flex-1 pr-2">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3">
+            <ScrollArea className="-mx-3 min-h-0 flex-1 px-3">
               {isStylesLoading ? (
                 <div className="flex min-h-32 items-center justify-center">
                   <LoadingSpinner label="Загружаем стили" />
@@ -553,7 +553,7 @@ function App() {
               Загрузка
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
             <div
               {...getRootProps()}
               className={cn(
@@ -568,8 +568,8 @@ function App() {
               </p>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1 pr-2">
-              <div className="grid gap-2">
+            <ScrollArea className="-mx-4 min-h-0 flex-1 px-4">
+              <div className="grid gap-2 pb-1">
                 {uploads.map((upload) => (
                   <div
                     key={upload.id}
@@ -629,9 +629,9 @@ function App() {
               </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
-            <ScrollArea className="min-h-0 flex-1 pr-3">
-              <div className="flex flex-col gap-3 px-1 py-1">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-3">
+            <ScrollArea className="-mx-3 min-h-0 flex-1 px-3">
+              <div className="flex flex-col gap-3 py-1 pr-1">
                 {history.map((session) => {
                   const activeGeneration =
                     session.generations.find(
@@ -768,7 +768,7 @@ function App() {
                 })}
               </div>
             </ScrollArea>
-            <div className="border-t pt-3 pb-1">
+            <div className="border-t pt-3 pb-3">
               <Button
                 className="w-full"
                 variant="outline"
