@@ -46,7 +46,6 @@ import type {
 } from '@/types'
 
 const MAX_FILES = 10
-const STYLE_EDITOR_PASSWORD = '1337'
 
 const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 
@@ -103,9 +102,6 @@ function App() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [editingStyle, setEditingStyle] = useState<StylePreset | null>(null)
-  const [isStylesUnlocked, setIsStylesUnlocked] = useState(false)
-  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
-  const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
   const [previewAsset, setPreviewAsset] = useState<{ url: string; label: string } | null>(null)
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([])
@@ -513,12 +509,6 @@ function App() {
 
   const openStyleCreator = (style?: StylePreset) => {
     if (!isRootAdmin) {
-      return
-    }
-
-    if (!isStylesUnlocked) {
-      setPendingStyleAction(style ?? 'new')
-      setIsPasswordDialogOpen(true)
       return
     }
 
@@ -1107,29 +1097,6 @@ function App() {
         style={editingStyle}
       />
 
-      <PasswordDialog
-        key={`${String(pendingStyleAction ?? 'none')}-${isPasswordDialogOpen ? 'open' : 'closed'}`}
-        open={isPasswordDialogOpen}
-        onClose={() => {
-          setIsPasswordDialogOpen(false)
-          setPendingStyleAction(null)
-        }}
-        onSuccess={() => {
-          setIsStylesUnlocked(true)
-          setIsPasswordDialogOpen(false)
-
-          if (pendingStyleAction === 'new') {
-            setEditingStyle(null)
-            setIsEditorOpen(true)
-          } else if (pendingStyleAction) {
-            setEditingStyle(pendingStyleAction)
-            setIsEditorOpen(true)
-          }
-
-          setPendingStyleAction(null)
-        }}
-      />
-
       <AdminPanel
         busy={isAdminBusy}
         generatedCredentials={generatedCredentials}
@@ -1387,60 +1354,6 @@ function StyleEditor({
               {busy ? <LoadingSpinner label="Сохраняю…" size="sm" /> : 'Сохранить'}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-type PasswordDialogProps = {
-  onClose: () => void
-  onSuccess: () => void
-  open: boolean
-}
-
-function PasswordDialog({ onClose, onSuccess, open }: PasswordDialogProps) {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-
-  return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Доступ к стилям</DialogTitle>
-          <DialogDescription>
-            Для добавления и редактирования стилей введите пароль.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <Input
-            type="password"
-            value={password}
-            onChange={(event) => {
-              setPassword(event.target.value)
-              if (error) {
-                setError('')
-              }
-            }}
-          />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button
-            onClick={() => {
-              if (password === STYLE_EDITOR_PASSWORD) {
-                onSuccess()
-                return
-              }
-
-              setError('Неверный пароль')
-            }}
-          >
-            Войти
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
