@@ -589,9 +589,9 @@ function App() {
         <Card className="w-full bg-card/90 backdrop-blur-sm">
           <CardHeader className="gap-2 border-b">
             <CardTitle className="text-lg">AI Icons</CardTitle>
-            <DialogDescription>
+            <p className="text-sm text-muted-foreground">
               Вход для сотрудников, которым разрешен доступ к генерациям.
-            </DialogDescription>
+            </p>
           </CardHeader>
           <CardContent className="flex flex-col gap-4 pt-4">
             <div className="flex flex-col gap-2">
