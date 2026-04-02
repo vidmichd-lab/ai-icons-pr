@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { clearHistory, loadHistory, saveHistory } from '@/lib/history'
@@ -490,7 +489,7 @@ function App() {
     <div className="mx-auto flex h-[100svh] w-full max-w-[1480px] flex-col overflow-hidden p-3 md:p-4">
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="min-h-16 border-b">
+          <CardHeader className="min-h-14 items-center border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">1</Badge>
               Стиль
@@ -538,18 +537,19 @@ function App() {
                 </div>
               )}
             </ScrollArea>
-            <Separator />
-            <div className="flex justify-center">
+          </CardContent>
+          <CardFooter className="mt-auto justify-center">
+            <div className="flex w-full justify-center">
               <Button size="icon-sm" variant="outline" onClick={() => openStyleCreator()}>
                 <PlusIcon />
                 <span className="sr-only">Добавить стиль</span>
               </Button>
             </div>
-          </CardContent>
+          </CardFooter>
         </Card>
 
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="min-h-16 border-b">
+          <CardHeader className="min-h-14 items-center border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">2</Badge>
               Загрузка
@@ -608,12 +608,12 @@ function App() {
         </Card>
 
         <Card className="h-full min-h-0 bg-card/85 backdrop-blur-sm">
-          <CardHeader className="min-h-16 border-b">
+          <CardHeader className="min-h-14 items-center border-b">
             <CardTitle className="flex items-center gap-2">
               <Badge variant="secondary">3</Badge>
               Результат
             </CardTitle>
-            <CardAction>
+            <CardAction className="self-center">
               <Button
                 size="sm"
                 variant="outline"
@@ -770,18 +770,18 @@ function App() {
                 })}
               </div>
             </ScrollArea>
-            <div className="border-t pt-4 pb-4">
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={clearHistoryState}
-                disabled={history.length === 0}
-              >
-                <Trash2Icon data-icon="inline-start" />
-                Очистить
-              </Button>
-            </div>
           </CardContent>
+          <CardFooter className="mt-auto">
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={clearHistoryState}
+              disabled={history.length === 0}
+            >
+              <Trash2Icon data-icon="inline-start" />
+              Очистить
+            </Button>
+          </CardFooter>
         </Card>
       </div>
 
