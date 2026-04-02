@@ -24,10 +24,10 @@ jobs:
             functions/api/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install backend dependencies
-        run: npm --prefix functions/api ci
+        run: npm --prefix functions/api install
 
       - name: Build frontend
         env:
