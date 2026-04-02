@@ -179,4 +179,12 @@ export const api = {
       }),
     )
   },
+
+  async deleteAdminUser(login: string) {
+    return ensureOk<{ ok: true }>(
+      await fetchApi(`/admin/users/${encodeURIComponent(login)}`, {
+        method: 'DELETE',
+      }),
+    )
+  },
 }

@@ -588,6 +588,18 @@ function App() {
     })
   }
 
+  const deleteManagedUser = (login: string) => {
+    startAdminMutation(async () => {
+      try {
+        await api.deleteAdminUser(login)
+        setManagedUsers((current) => current.filter((user) => user.login !== login))
+        setNotice('')
+      } catch (error) {
+        setNotice(ensureErrorMessage(error))
+      }
+    })
+  }
+
   const downloadPng = async (url: string, fileName: string) => {
     setActiveDownloadId(fileName)
 
@@ -1127,6 +1139,7 @@ function App() {
           setGeneratedCredentials(null)
         }}
         onCreateUser={createManagedUser}
+        onDeleteUser={deleteManagedUser}
         open={isAdminPanelOpen}
         users={managedUsers}
       />
@@ -1159,6 +1172,7 @@ type AdminPanelProps = {
   loading: boolean
   onClose: () => void
   onCreateUser: (payload: { login: string; name: string }) => void
+  onDeleteUser: (login: string) => void
   open: boolean
   users: ManagedUser[]
 }
@@ -1169,6 +1183,7 @@ function AdminPanel({
   loading,
   onClose,
   onCreateUser,
+  onDeleteUser,
   open,
   users,
 }: AdminPanelProps) {
@@ -1253,9 +1268,22 @@ function AdminPanel({
                         <div className="truncate text-sm font-semibold text-foreground">{user.login}</div>
                         <div className="truncate text-xs text-muted-foreground">{user.name}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs font-medium text-foreground">{user.quota.remaining}/{user.quota.limit}</div>
-                        <div className="text-[11px] text-muted-foreground">{user.role}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-xs font-medium text-foreground">{user.quota.remaining}/{user.quota.limit}</div>
+                          <div className="text-[11px] text-muted-foreground">{user.role}</div>
+                        </div>
+                        {user.login !== 'vidmich' ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            onClick={() => onDeleteUser(user.login)}
+                            disabled={busy}
+                          >
+                            <Trash2Icon data-icon="inline-start" />
+                            Удалить
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   ))

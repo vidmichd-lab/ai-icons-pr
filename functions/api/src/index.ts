@@ -885,7 +885,8 @@ const appHandler = async (event: HttpEvent) => {
       path === '/generations' ||
       path.startsWith('/jobs/') ||
       path === '/download' ||
-      path === '/admin/users'
+      path === '/admin/users' ||
+      path.startsWith('/admin/users/')
 
     if (isProtectedRoute && !currentUser) {
       return response(
@@ -1118,6 +1119,32 @@ const appHandler = async (event: HttpEvent) => {
         user: await toManagedUser(nextUser),
         password,
       })
+    }
+
+    if (event.httpMethod === 'DELETE' && path.startsWith('/admin/users/')) {
+      if (!currentUser || !isRootAdmin(currentUser.user)) {
+        return response(403, { error: 'Недостаточно прав' })
+      }
+
+      const login = normalizeLogin(decodeURIComponent(path.split('/').pop() ?? ''))
+
+      if (!login) {
+        return response(400, { error: 'Логин обязателен' })
+      }
+
+      if (login === rootAdminLogin) {
+        return response(400, { error: 'Нельзя удалить root-admin пользователя' })
+      }
+
+      const users = await readUsers()
+      const existing = users.find((user) => user.login === login)
+
+      if (!existing) {
+        return response(404, { error: 'Пользователь не найден' })
+      }
+
+      await writeUsers(users.filter((user) => user.login !== login))
+      return response(200, { ok: true })
     }
 
     if (event.httpMethod === 'POST' && path === '/assets') {
