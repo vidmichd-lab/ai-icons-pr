@@ -21,6 +21,7 @@
 - `Yandex Object Storage`
 - хранит статический фронтенд
 - хранит `config/styles.json`
+- дефолтные preview пресетов вшиты в backend как data URL
 - хранит preview-картинки пользовательских стилей
 
 ## Потоки данных
@@ -46,7 +47,8 @@
 1. frontend запрашивает список стилей
 2. backend читает `config/styles.json` из bucket
 3. если файла нет, backend инициализирует его дефолтным набором
-4. CRUD по стилям обновляет manifest и preview-файлы в storage
+4. backend автоматически мигрирует старые локальные preview пути в встроенные data URL
+5. CRUD по стилям обновляет manifest и preview-файлы в storage
 
 ## Важные технические решения
 

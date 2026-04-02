@@ -6,6 +6,8 @@ import {
 } from '@aws-sdk/client-s3'
 import { z } from 'zod'
 
+import { defaultStylePreviews } from './default-style-previews'
+
 type HttpEvent = {
   httpMethod?: string
   path?: string
@@ -24,6 +26,25 @@ type StylePreset = {
   updatedAt: string
 }
 
+const isDefaultPreviewPath = (value: string) => value.startsWith('/previews/')
+
+const getEmbeddedDefaultPreview = (styleId: string) => {
+  switch (styleId) {
+    case 'frosted-glow':
+      return defaultStylePreviews.frostedGlow
+    case 'soft-silicone':
+      return defaultStylePreviews.softSilicone
+    case 'frosted-vibrant':
+      return defaultStylePreviews.frostedVibrant
+    case 'gel-silicone':
+      return defaultStylePreviews.gelSilicone
+    case 'embossed-rubber':
+      return defaultStylePreviews.embossedRubber
+    default:
+      return defaultStylePreviews.frostedGlow
+  }
+}
+
 const defaultStyles: StylePreset[] = [
   {
     id: 'frosted-glow',
@@ -31,7 +52,7 @@ const defaultStyles: StylePreset[] = [
     prompt:
       'translucent colored frosted glass material, subtle subsurface scattering, soft edge glow, smooth gradient lighting, minimal studio render, soft volumetric illumination, clean CGI aesthetic, black background, bright color from reference',
     shortPrompt: 'Glass, glow, black backdrop',
-    previewUrl: '/previews/1.png',
+    previewUrl: defaultStylePreviews.frostedGlow,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -41,7 +62,7 @@ const defaultStyles: StylePreset[] = [
     prompt:
       'soft matte silicone rubber material, smooth tactile surface, minimal industrial design, colors from reference bright, clear white background without shadows',
     shortPrompt: 'Matte silicone on white',
-    previewUrl: '/previews/2.png',
+    previewUrl: defaultStylePreviews.softSilicone,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -51,7 +72,7 @@ const defaultStyles: StylePreset[] = [
     prompt:
       'translucent frosted glass material, diffusion, elegant minimal object aesthetic, same colors from reference, vibrant',
     shortPrompt: 'Minimal vibrant glass',
-    previewUrl: '/previews/3.png',
+    previewUrl: defaultStylePreviews.frostedVibrant,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -61,7 +82,7 @@ const defaultStyles: StylePreset[] = [
     prompt:
       'transparent gel silicone material, thick soft gel texture, internal light reflections, flat white background, frontal view, studio lightning',
     shortPrompt: 'Transparent gel texture',
-    previewUrl: '/previews/4.png',
+    previewUrl: defaultStylePreviews.gelSilicone,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -71,7 +92,7 @@ const defaultStyles: StylePreset[] = [
     prompt:
       'minimal embossed rubber icon style, matte black silicone material, subtle micro texture, deep debossed logo engraving, soft diffused studio lighting, industrial product photography, monochrome palette, tactile rubber surface, centered composition on neutral background, premium minimal tech aesthetic, high-detail 3D render',
     shortPrompt: 'Premium matte black rubber',
-    previewUrl: '/previews/5.png',
+    previewUrl: defaultStylePreviews.embossedRubber,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -176,7 +197,7 @@ const readStyles = async (): Promise<StylePreset[]> => {
     )
 
     const text = await streamToString(data.Body)
-    return z.array(
+    const styles = z.array(
       z.object({
         id: z.string(),
         name: z.string(),
@@ -187,6 +208,21 @@ const readStyles = async (): Promise<StylePreset[]> => {
         updatedAt: z.string(),
       }),
     ).parse(JSON.parse(text))
+
+    const migratedStyles = styles.map((style) =>
+      isDefaultPreviewPath(style.previewUrl)
+        ? {
+            ...style,
+            previewUrl: getEmbeddedDefaultPreview(style.id),
+          }
+        : style,
+    )
+
+    if (migratedStyles.some((style, index) => style.previewUrl !== styles[index]?.previewUrl)) {
+      await writeStyles(migratedStyles)
+    }
+
+    return migratedStyles
   } catch (error) {
     if ((error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode !== 404) {
       console.error(error)
@@ -359,7 +395,7 @@ export const handler = async (event: HttpEvent) => {
       }
 
       const previewUrl =
-        file instanceof File ? await uploadPreview(file) : '/previews/1.png'
+        file instanceof File ? await uploadPreview(file) : defaultStylePreviews.frostedGlow
       const now = new Date().toISOString()
 
       const style: StylePreset = {
