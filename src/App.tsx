@@ -9,7 +9,6 @@ import {
   Card,
   CardAction,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -598,7 +597,6 @@ function App() {
               <Badge variant="secondary">2</Badge>
               Загрузка
             </CardTitle>
-            <CardDescription>До 10 файлов, лучше квадратный исходник на белом фоне.</CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
             <div
@@ -610,7 +608,9 @@ function App() {
             >
               <input {...getInputProps()} />
               <div className="text-sm font-semibold text-foreground">Перетащите файлы сюда</div>
-              <p className="mt-1 text-xs text-muted-foreground">PNG, JPG или WebP</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                До 10 файлов, квадратный исходник PNG, JPG, WEBP с иконкой на белом фоне
+              </p>
             </div>
 
             <ScrollArea className="min-h-0 flex-1 pr-2">
