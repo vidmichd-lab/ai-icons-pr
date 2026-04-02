@@ -774,6 +774,22 @@ const appHandler = async (event: HttpEvent) => {
 
     const path = event.path ?? '/'
     const request = buildRequest(event)
+    const currentUser = await getCurrentUser(event.headers)
+    const isProtectedRoute =
+      path === '/styles' ||
+      path.startsWith('/styles/') ||
+      path === '/assets' ||
+      path === '/generations' ||
+      path.startsWith('/jobs/') ||
+      path === '/download'
+
+    if (isProtectedRoute && !currentUser) {
+      return response(
+        401,
+        { error: 'Не авторизован' },
+        { 'Set-Cookie': clearSessionCookie() },
+      )
+    }
 
     if (event.httpMethod === 'POST' && path === '/auth/login') {
       const payload = z.object({
@@ -812,8 +828,6 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'GET' && path === '/auth/me') {
-      const currentUser = await getCurrentUser(event.headers)
-
       if (!currentUser) {
         return response(
           401,
@@ -828,8 +842,6 @@ const appHandler = async (event: HttpEvent) => {
     }
 
     if (event.httpMethod === 'POST' && path === '/auth/logout') {
-      const currentUser = await getCurrentUser(event.headers)
-
       if (currentUser?.sessionId) {
         await deleteSession(currentUser.sessionId).catch(() => undefined)
       }

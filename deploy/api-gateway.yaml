@@ -9,16 +9,6 @@ x-yc-apigateway:
     app_origin:
       default: "https://ai-icons-practicum.website.yandexcloud.net"
 components:
-  securitySchemes:
-    sessionCookie:
-      type: apiKey
-      in: cookie
-      name: ai_icons_session
-      x-yc-apigateway-authorizer:
-        type: function
-        function_id: ${var.function_id}
-        tag: "$latest"
-        authorizer_result_ttl_in_seconds: 60
 paths:
   /:
     options:
@@ -36,8 +26,6 @@ paths:
         default:
           description: CORS preflight
     x-yc-apigateway-any-method:
-      security:
-        - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: ${var.function_id}
@@ -92,8 +80,6 @@ paths:
         default:
           description: CORS preflight
     x-yc-apigateway-any-method:
-      security:
-        - sessionCookie: []
       x-yc-apigateway-integration:
         type: cloud_functions
         function_id: ${var.function_id}

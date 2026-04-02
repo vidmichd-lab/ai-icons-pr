@@ -49,8 +49,8 @@
 2. frontend запрашивает `/auth/me`
 3. если сессии нет, показывается login screen
 4. `/auth/login` проверяет пользователя и ставит `HttpOnly` cookie
-5. `API Gateway` authorizer валидирует cookie на каждом защищенном API маршруте
-6. backend получает только уже авторизованные запросы
+5. frontend отправляет запросы к API только с `credentials: include`
+6. backend валидирует cookie на каждом защищенном API маршруте и сам возвращает `401` с корректными CORS headers
 
 ### Стили
 
@@ -66,5 +66,5 @@
 - blob URL не используются для persisted history, потому что они умирают после reload
 - превью результата используется по URL из `Krea`, а скачивание идет через backend proxy, чтобы обойти CORS
 - backend proxy дополнительно ограничен по безопасным remote host'ам, чтобы не превращаться в открытый fetch endpoint
-- доступ к API контролируется не ссылкой, а cookie-сессией через `API Gateway function authorizer`
+- доступ к API контролируется не ссылкой, а cookie-сессией, которую проверяет сам backend
 - backend и frontend деплоятся независимо, но из одного GitHub Actions workflow

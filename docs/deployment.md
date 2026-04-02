@@ -13,7 +13,7 @@
 
 - frontend bundle в `Object Storage`
 - backend function version в `Yandex Cloud Functions`
-- gateway spec с function authorizer и CORS под cookie-сессии
+- gateway spec с proxy routes и CORS под cookie-сессии
 
 ## GitHub Actions
 
