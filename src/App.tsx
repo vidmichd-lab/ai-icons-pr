@@ -646,6 +646,7 @@ function App() {
                     ) ??
                     session.generations.find((generation) => generation.resultUrl) ??
                     activeGeneration
+                  const previewUrl = previewGeneration?.resultUrl || session.sourcePreviewUrl
 
                   return (
                     <Card
@@ -656,7 +657,8 @@ function App() {
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
                           <img
-                            src={previewGeneration?.resultUrl ?? session.sourcePreviewUrl}
+                            key={previewUrl}
+                            src={previewUrl}
                             alt={session.sourceName}
                             className="size-24 rounded-lg object-cover"
                           />
