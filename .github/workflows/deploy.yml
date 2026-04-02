@@ -64,6 +64,7 @@ jobs:
           YC_STORAGE_SECRET_KEY: ${{ secrets.YC_STORAGE_SECRET_KEY }}
           YC_STORAGE_PUBLIC_BASE_URL: ${{ vars.YC_STORAGE_PUBLIC_BASE_URL }}
         run: |
+          FUNCTION_ENV="KREA_API_TOKEN=$KREA_API_TOKEN,STORAGE_BUCKET=$YC_BUCKET_NAME,STORAGE_ACCESS_KEY=$YC_STORAGE_ACCESS_KEY,STORAGE_SECRET_KEY=$YC_STORAGE_SECRET_KEY,STORAGE_REGION=ru-central1,STORAGE_ENDPOINT=https://storage.yandexcloud.net,STORAGE_PUBLIC_BASE_URL=$YC_STORAGE_PUBLIC_BASE_URL"
           yc serverless function version create \
             --function-name "$YC_FUNCTION_NAME" \
             --runtime nodejs22 \
@@ -71,14 +72,7 @@ jobs:
             --memory 512MB \
             --execution-timeout 30s \
             --source-path functions/api/dist \
-            --environment \
-              KREA_API_TOKEN="$KREA_API_TOKEN",\
-STORAGE_BUCKET="$YC_BUCKET_NAME",\
-STORAGE_ACCESS_KEY="$YC_STORAGE_ACCESS_KEY",\
-STORAGE_SECRET_KEY="$YC_STORAGE_SECRET_KEY",\
-STORAGE_REGION=ru-central1,\
-STORAGE_ENDPOINT=https://storage.yandexcloud.net,\
-STORAGE_PUBLIC_BASE_URL="$YC_STORAGE_PUBLIC_BASE_URL"
+            --environment "$FUNCTION_ENV"
           yc serverless function allow-unauthenticated-invoke "$YC_FUNCTION_NAME"
 
       - name: Upload frontend bundle
