@@ -8,10 +8,6 @@ type GenerationRequest = {
   seed: number
 }
 
-type CutoutRequest = {
-  imageUrl: string
-}
-
 const ensureOk = async <T>(response: Response): Promise<T> => {
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
@@ -95,19 +91,6 @@ export const api = {
       }),
     )
   },
-
-  async createCutout(payload: CutoutRequest) {
-    return ensureOk<{ jobId: string; status: GenerationStatus }>(
-      await fetch(`${API_BASE_URL}/cutout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }),
-    )
-  },
-
   async getJob(jobId: string) {
     return ensureOk<{
       status: GenerationStatus

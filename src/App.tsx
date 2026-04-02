@@ -44,6 +44,21 @@ const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 const ensureErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Что-то пошло не так'
 
+const blobToDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error('Не удалось подготовить PNG'))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Не удалось прочитать PNG'))
+    reader.readAsDataURL(blob)
+  })
+
 const updateSession = (
   sessions: HistorySession[],
   sessionId: string,
@@ -367,21 +382,33 @@ function App() {
 
     startGenerating(async () => {
       try {
-        const response = await api.createCutout({
-          imageUrl: selectedGeneration.resultUrl!,
+        setHistory((current) =>
+          updateSession(current, session.id, (item) =>
+            patchGeneration(item, generationId, (generation) => ({
+              ...generation,
+              status: 'processing',
+            })),
+          ),
+        )
+
+        const { removeBackground } = await import('@imgly/background-removal')
+        const blob = await removeBackground(selectedGeneration.resultUrl!, {
+          output: {
+            format: 'image/png',
+            quality: 1,
+          },
         })
+        const resultUrl = await blobToDataUrl(blob)
 
         setHistory((current) =>
           updateSession(current, session.id, (item) =>
             patchGeneration(item, generationId, (generation) => ({
               ...generation,
-              jobId: response.jobId,
-              status: response.status,
+              status: 'completed',
+              resultUrl,
             })),
           ),
         )
-
-        void pollJob(session.id, generationId, response.jobId)
       } catch (error) {
         setHistory((current) =>
           updateSession(current, session.id, (item) =>
