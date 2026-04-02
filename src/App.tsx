@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { DownloadIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
+import { DownloadIcon, LoaderCircleIcon, PlusIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react'
 import { zipSync, strToU8 } from 'fflate'
 
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,9 @@ const newSeed = () => Math.floor(Math.random() * 4_294_967_295)
 const ensureErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Что-то пошло не так'
 
+const isPendingStatus = (status?: GeneratedAsset['status']) =>
+  status !== 'completed' && status !== 'failed' && status !== 'cancelled'
+
 const updateSession = (
   sessions: HistorySession[],
   sessionId: string,
@@ -70,6 +73,9 @@ function App() {
   const [uploads, setUploads] = useState<SourceUpload[]>([])
   const [history, setHistory] = useState<HistorySession[]>(() => loadHistory())
   const [notice, setNotice] = useState<string>('')
+  const [isStylesLoading, setIsStylesLoading] = useState(true)
+  const [isArchiveDownloading, setIsArchiveDownloading] = useState(false)
+  const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
   const [isGenerating, startGenerating] = useTransition()
   const [isStylesBusy, startStylesMutation] = useTransition()
   const [isHydrated, setIsHydrated] = useState(false)
@@ -80,11 +86,19 @@ function App() {
   const [pendingStyleAction, setPendingStyleAction] = useState<StylePreset | null | 'new'>(null)
 
   useEffect(() => {
-    void api.getStyles().then((response) => {
-      setStyles(response.styles)
-      setSelectedStyleId((current) => current || response.styles[0]?.id || '')
-      setIsHydrated(true)
-    })
+    void api
+      .getStyles()
+      .then((response) => {
+        setStyles(response.styles)
+        setSelectedStyleId((current) => current || response.styles[0]?.id || '')
+      })
+      .catch((error) => {
+        setNotice(ensureErrorMessage(error))
+      })
+      .finally(() => {
+        setIsStylesLoading(false)
+        setIsHydrated(true)
+      })
   }, [])
 
   useEffect(() => {
@@ -376,10 +390,27 @@ function App() {
   }
 
   const downloadPng = async (url: string, fileName: string) => {
-    const link = document.createElement('a')
-    link.href = api.downloadUrl(url, fileName)
-    link.download = fileName
-    link.click()
+    setActiveDownloadId(fileName)
+
+    try {
+      const response = await fetch(api.downloadUrl(url, fileName))
+
+      if (!response.ok) {
+        throw new Error('Не удалось скачать PNG')
+      }
+
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = fileName
+      link.click()
+      URL.revokeObjectURL(objectUrl)
+    } catch (error) {
+      setNotice(ensureErrorMessage(error))
+    } finally {
+      setActiveDownloadId(null)
+    }
   }
 
   const downloadSelectedArchive = async () => {
@@ -405,36 +436,44 @@ function App() {
       return
     }
 
-    const entries = await Promise.all(
-      selected.map(async (entry, index) => {
-        const response = await fetch(api.downloadUrl(entry.url, entry.label))
+    setIsArchiveDownloading(true)
 
-        if (!response.ok) {
-          throw new Error('Не удалось скачать один из результатов')
-        }
+    try {
+      const entries = await Promise.all(
+        selected.map(async (entry, index) => {
+          const response = await fetch(api.downloadUrl(entry.url, entry.label))
 
-        const buffer = new Uint8Array(await response.arrayBuffer())
-        const safeName = `${String(index + 1).padStart(2, '0')}-${entry.label}`
-        return [safeName, buffer] as const
-      }),
-    )
+          if (!response.ok) {
+            throw new Error('Не удалось скачать один из результатов')
+          }
 
-    const archiveEntries: Record<string, Uint8Array> = {
-      'README.txt': strToU8('Selected generations from AI Icons Studio') as Uint8Array,
+          const buffer = new Uint8Array(await response.arrayBuffer())
+          const safeName = `${String(index + 1).padStart(2, '0')}-${entry.label}`
+          return [safeName, buffer] as const
+        }),
+      )
+
+      const archiveEntries: Record<string, Uint8Array> = {
+        'README.txt': strToU8('Selected generations from AI Icons Studio') as Uint8Array,
+      }
+
+      for (const [fileName, bytes] of entries) {
+        archiveEntries[fileName] = bytes as Uint8Array
+      }
+
+      const archive = zipSync(archiveEntries)
+      const blob = new Blob([archive as BlobPart], { type: 'application/zip' })
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = 'ai-icons-selected.zip'
+      link.click()
+      URL.revokeObjectURL(objectUrl)
+    } catch (error) {
+      setNotice(ensureErrorMessage(error))
+    } finally {
+      setIsArchiveDownloading(false)
     }
-
-    for (const [fileName, bytes] of entries) {
-      archiveEntries[fileName] = bytes as Uint8Array
-    }
-
-    const archive = zipSync(archiveEntries)
-    const blob = new Blob([archive as BlobPart], { type: 'application/zip' })
-    const objectUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = objectUrl
-    link.download = 'ai-icons-selected.zip'
-    link.click()
-    URL.revokeObjectURL(objectUrl)
   }
 
   const selectedCompletedCount = history.reduce((count, session) => {
@@ -460,38 +499,44 @@ function App() {
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 px-3">
             <ScrollArea className="min-h-0 flex-1 pr-2">
-              <div className="flex flex-col gap-2">
-                {styles.map((style) => (
-                  <button
-                    key={style.id}
-                    type="button"
-                    onClick={() => setSelectedStyleId(style.id)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-xl border border-border bg-background/80 p-2 text-left transition hover:bg-muted/70',
-                      style.id === selectedStyleId && 'border-secondary bg-accent/70 ring-1 ring-secondary/40',
-                    )}
-                  >
-                    <img
-                      src={style.previewUrl}
-                      alt={style.name}
-                      className="size-16 rounded-lg object-cover"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-foreground">{style.name}</div>
-                    </div>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        openStyleCreator(style)
-                      }}
+              {isStylesLoading ? (
+                <div className="flex min-h-32 items-center justify-center">
+                  <LoadingSpinner label="Загружаем стили" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {styles.map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => setSelectedStyleId(style.id)}
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-xl border border-border bg-background/80 p-2 text-left transition hover:bg-muted/70',
+                        style.id === selectedStyleId && 'border-secondary bg-accent/70 ring-1 ring-secondary/40',
+                      )}
                     >
-                      Edit
-                    </Button>
-                  </button>
-                ))}
-              </div>
+                      <img
+                        src={style.previewUrl}
+                        alt={style.name}
+                        className="size-16 rounded-lg object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-foreground">{style.name}</div>
+                      </div>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openStyleCreator(style)
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </button>
+                  ))}
+                </div>
+              )}
             </ScrollArea>
             <Separator />
             <div className="flex justify-center">
@@ -551,7 +596,7 @@ function App() {
               disabled={!isHydrated || isGenerating || uploads.length === 0}
               onClick={handleGenerate}
             >
-              {isGenerating ? 'Генерация идет…' : 'Сгенерировать'}
+              {isGenerating ? <LoadingSpinner label="Генерация идет…" size="sm" /> : 'Сгенерировать'}
             </Button>
             {uploads.length > 0 ? (
               <Button className="w-full" variant="outline" onClick={clearUploads}>
@@ -575,8 +620,14 @@ function App() {
                 onClick={() => void downloadSelectedArchive()}
                 disabled={selectedCompletedCount === 0}
               >
-                <DownloadIcon data-icon="inline-start" />
-                Скачать архив
+                {isArchiveDownloading ? (
+                  <LoadingSpinner label="Собираем архив" size="sm" />
+                ) : (
+                  <>
+                    <DownloadIcon data-icon="inline-start" />
+                    Скачать архив
+                  </>
+                )}
               </Button>
             </CardAction>
           </CardHeader>
@@ -615,7 +666,16 @@ function App() {
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">{session.styleName}</p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                              {activeGeneration?.error ?? statusLabel(activeGeneration?.status)}
+                              {activeGeneration?.error ? (
+                                activeGeneration.error
+                              ) : isPendingStatus(activeGeneration?.status) ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <LoaderCircleIcon className="size-3.5 animate-spin" />
+                                  {statusLabel(activeGeneration?.status)}
+                                </span>
+                              ) : (
+                                statusLabel(activeGeneration?.status)
+                              )}
                             </p>
                           </div>
                         </div>
@@ -644,7 +704,11 @@ function App() {
                                       )
                                     }
                                   >
-                                    <DownloadIcon />
+                                    {activeDownloadId === `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png` ? (
+                                      <LoaderCircleIcon className="animate-spin" />
+                                    ) : (
+                                      <DownloadIcon />
+                                    )}
                                     <span className="sr-only">Скачать PNG</span>
                                   </Button>
                                 ) : null}
@@ -667,8 +731,8 @@ function App() {
                                       className="aspect-square w-full object-cover"
                                     />
                                   ) : (
-                                    <div className="flex aspect-square items-center justify-center text-xs font-semibold text-muted-foreground">
-                                      {shortStatus(generation.status)}
+                                    <div className="flex aspect-square items-center justify-center">
+                                      <LoadingSpinner label={shortStatus(generation.status)} size="sm" />
                                     </div>
                                   )}
                                 </button>
@@ -845,7 +909,7 @@ function StyleEditor({
                 })
               }
             >
-              {busy ? 'Сохраняю…' : 'Сохранить'}
+              {busy ? <LoadingSpinner label="Сохраняю…" size="sm" /> : 'Сохранить'}
             </Button>
           </div>
         </DialogFooter>
@@ -938,6 +1002,22 @@ const shortStatus = (status: GeneratedAsset['status']) => {
     default:
       return '...'
   }
+}
+
+type LoadingSpinnerProps = {
+  label?: string
+  size?: 'sm' | 'default'
+}
+
+function LoadingSpinner({ label, size = 'default' }: LoadingSpinnerProps) {
+  return (
+    <span className="inline-flex items-center gap-2 text-muted-foreground">
+      <LoaderCircleIcon
+        className={cn('animate-spin', size === 'sm' ? 'size-3.5' : 'size-4')}
+      />
+      {label ? <span>{label}</span> : null}
+    </span>
+  )
 }
 
 export default App
