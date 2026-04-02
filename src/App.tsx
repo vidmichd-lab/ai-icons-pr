@@ -571,7 +571,18 @@ function App() {
             </ScrollArea>
           </CardContent>
           <CardFooter className="mt-auto justify-center">
-            <div className="flex w-full justify-center">
+            <div className="flex w-full items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Вайб-код от{' '}
+                <a
+                  className="font-medium text-foreground underline underline-offset-2"
+                  href="https://staff.yandex-team.ru/vidmich"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  @vidmich
+                </a>
+              </p>
               <Button size="icon-sm" variant="outline" onClick={() => openStyleCreator()}>
                 <PlusIcon />
                 <span className="sr-only">Добавить стиль</span>
