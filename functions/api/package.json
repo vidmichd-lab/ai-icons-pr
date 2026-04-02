@@ -1,0 +1,15 @@
+{
+  "name": "ai-icons-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11"
+  }
+}
