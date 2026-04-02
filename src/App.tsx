@@ -465,14 +465,10 @@ function App() {
   }
 
   const downloadPng = async (url: string, fileName: string) => {
-    const response = await fetch(url)
-    const blob = await response.blob()
-    const objectUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = objectUrl
+    link.href = api.downloadUrl(url, fileName)
     link.download = fileName
     link.click()
-    URL.revokeObjectURL(objectUrl)
   }
 
   const downloadSelectedArchive = async () => {
@@ -500,7 +496,12 @@ function App() {
 
     const entries = await Promise.all(
       selected.map(async (entry, index) => {
-        const response = await fetch(entry.url)
+        const response = await fetch(api.downloadUrl(entry.url, entry.label))
+
+        if (!response.ok) {
+          throw new Error('Не удалось скачать один из результатов')
+        }
+
         const buffer = new Uint8Array(await response.arrayBuffer())
         const safeName = `${String(index + 1).padStart(2, '0')}-${entry.label}`
         return [safeName, buffer] as const

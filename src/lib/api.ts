@@ -36,6 +36,16 @@ const createFormData = (payload: EditableStylePayload) => {
 }
 
 export const api = {
+  downloadUrl(assetUrl: string, fileName?: string) {
+    const params = new URLSearchParams({ url: assetUrl })
+
+    if (fileName) {
+      params.set('fileName', fileName)
+    }
+
+    return `${API_BASE_URL}/download?${params.toString()}`
+  },
+
   async getStyles() {
     return ensureOk<{ styles: StylePreset[] }>(
       await fetch(`${API_BASE_URL}/styles`),

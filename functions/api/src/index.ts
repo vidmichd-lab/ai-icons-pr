@@ -14,6 +14,7 @@ type HttpEvent = {
   body?: string | null
   headers?: Record<string, string | undefined>
   isBase64Encoded?: boolean
+  queryStringParameters?: Record<string, string | undefined>
 }
 
 type StylePreset = {
@@ -160,6 +161,28 @@ const response = (statusCode: number, body: unknown) => ({
   body: JSON.stringify(body),
 })
 
+const binaryResponse = (
+  statusCode: number,
+  body: Buffer,
+  options: {
+    contentType: string
+    fileName?: string
+  },
+) => ({
+  statusCode,
+  headers: {
+    ...corsHeaders,
+    'Content-Type': options.contentType,
+    ...(options.fileName
+      ? {
+          'Content-Disposition': `attachment; filename="${options.fileName.replace(/"/g, '')}"`,
+        }
+      : {}),
+  },
+  body: body.toString('base64'),
+  isBase64Encoded: true,
+})
+
 const streamToString = async (
   stream: NodeJS.ReadableStream | ReadableStream<Uint8Array> | Blob | undefined,
 ) => {
@@ -277,13 +300,23 @@ const buildRequest = (event: HttpEvent) => {
     }
   })
 
+  const searchParams = new URLSearchParams()
+
+  Object.entries(event.queryStringParameters ?? {}).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      searchParams.set(key, value)
+    }
+  })
+
   const body = event.body
     ? event.isBase64Encoded
       ? Buffer.from(event.body, 'base64')
       : event.body
     : undefined
 
-  return new Request(`https://internal${event.path ?? '/'}`, {
+  const query = searchParams.toString()
+
+  return new Request(`https://internal${event.path ?? '/'}${query ? `?${query}` : ''}`, {
     method: event.httpMethod,
     headers,
     body: body as BodyInit | undefined,
@@ -362,6 +395,27 @@ const getJob = async (jobId: string) => {
     status: data.status,
     error: data.error,
     resultUrl: data.result?.urls?.[0],
+  }
+}
+
+const downloadRemoteAsset = async (assetUrl: string) => {
+  const target = new URL(assetUrl)
+
+  if (target.protocol !== 'https:') {
+    throw new Error('Only https download URLs are allowed')
+  }
+
+  const result = await fetch(target)
+
+  if (!result.ok) {
+    throw new Error(`Asset download failed with ${result.status}`)
+  }
+
+  const arrayBuffer = await result.arrayBuffer()
+
+  return {
+    body: Buffer.from(arrayBuffer),
+    contentType: result.headers.get('content-type') || 'application/octet-stream',
   }
 }
 
@@ -523,6 +577,21 @@ export const handler = async (event: HttpEvent) => {
       const jobId = path.split('/').pop() ?? ''
       const job = await getJob(jobId)
       return response(200, job)
+    }
+
+    if (event.httpMethod === 'GET' && path === '/download') {
+      const url = request.url ? new URL(request.url).searchParams.get('url') : null
+      const fileName = request.url ? new URL(request.url).searchParams.get('fileName') : null
+
+      if (!url) {
+        return response(400, { error: 'url is required' })
+      }
+
+      const asset = await downloadRemoteAsset(url)
+      return binaryResponse(200, asset.body, {
+        contentType: asset.contentType,
+        fileName: fileName ?? undefined,
+      })
     }
 
     return response(404, { error: 'Not found' })
