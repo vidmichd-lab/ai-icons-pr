@@ -92,7 +92,7 @@ function App() {
   const [isLoggingIn, startLogin] = useTransition()
   const [selectedStyleId, setSelectedStyleId] = useState<string>('')
   const [uploads, setUploads] = useState<SourceUpload[]>([])
-  const [history, setHistory] = useState<HistorySession[]>(() => loadHistory())
+  const [history, setHistory] = useState<HistorySession[]>([])
   const [notice, setNotice] = useState<string>('')
   const [isStylesLoading, setIsStylesLoading] = useState(true)
   const [isArchiveDownloading, setIsArchiveDownloading] = useState(false)
@@ -179,8 +179,21 @@ function App() {
   }, [])
 
   useEffect(() => {
-    saveHistory(history)
-  }, [history])
+    if (!authUser?.login) {
+      return
+    }
+
+    saveHistory(authUser.login, history)
+  }, [authUser?.login, history])
+
+  useEffect(() => {
+    if (!authUser?.login) {
+      setHistory([])
+      return
+    }
+
+    setHistory(loadHistory(authUser.login))
+  }, [authUser?.login])
 
   useEffect(() => {
     if (isAdminPanelOpen && isRootAdmin) {
@@ -231,7 +244,9 @@ function App() {
   }
 
   const clearHistoryState = () => {
-    clearHistory()
+    if (authUser?.login) {
+      clearHistory(authUser.login)
+    }
     setHistory([])
   }
 

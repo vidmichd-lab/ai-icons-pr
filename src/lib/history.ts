@@ -1,6 +1,8 @@
 import type { HistorySession } from '../types'
 
-const STORAGE_KEY = 'ai-icons-history-v1'
+const STORAGE_KEY_PREFIX = 'ai-icons-history-v2'
+
+const storageKey = (login: string) => `${STORAGE_KEY_PREFIX}:${login}`
 
 const normalizeSession = (session: HistorySession): HistorySession | null => {
   if (!session?.id || !session?.sourceName || !session?.styleId || !session?.styleName) {
@@ -19,9 +21,9 @@ const normalizeSession = (session: HistorySession): HistorySession | null => {
   }
 }
 
-export const loadHistory = (): HistorySession[] => {
+export const loadHistory = (login: string): HistorySession[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKey(login))
     if (!raw) {
       return []
     }
@@ -37,10 +39,10 @@ export const loadHistory = (): HistorySession[] => {
   }
 }
 
-export const saveHistory = (history: HistorySession[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
+export const saveHistory = (login: string, history: HistorySession[]) => {
+  localStorage.setItem(storageKey(login), JSON.stringify(history))
 }
 
-export const clearHistory = () => {
-  localStorage.removeItem(STORAGE_KEY)
+export const clearHistory = (login: string) => {
+  localStorage.removeItem(storageKey(login))
 }
