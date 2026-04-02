@@ -570,12 +570,12 @@ function App() {
               )}
             </ScrollArea>
           </CardContent>
-          <CardFooter className="mt-auto justify-center">
+          <CardFooter className="mt-auto justify-center py-3">
             <div className="flex w-full items-center justify-between gap-3">
               <p className="text-xs text-muted-foreground">
                 Вайб-код от{' '}
                 <a
-                  className="font-medium text-foreground underline underline-offset-2"
+                  className="font-medium text-foreground"
                   href="https://staff.yandex-team.ru/vidmich"
                   rel="noreferrer"
                   target="_blank"
@@ -633,7 +633,7 @@ function App() {
               </div>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="mt-auto flex-col gap-2">
+          <CardFooter className="mt-auto flex-col gap-2 py-3">
             <Button
               className="w-full"
               disabled={!isHydrated || isGenerating || uploads.length === 0}
@@ -814,7 +814,7 @@ function App() {
               </div>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="mt-auto">
+          <CardFooter className="mt-auto py-3">
             <Button
               className="w-full"
               variant="outline"
