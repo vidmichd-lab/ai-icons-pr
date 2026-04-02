@@ -243,12 +243,15 @@ const readStyles = async (): Promise<StylePreset[]> => {
 
     return migratedStyles
   } catch (error) {
-    if ((error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode !== 404) {
-      console.error(error)
+    const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode
+
+    if (statusCode === 404) {
+      await writeStyles(defaultStyles)
+      return defaultStyles
     }
 
-    await writeStyles(defaultStyles)
-    return defaultStyles
+    console.error('Failed to read styles manifest without resetting defaults', error)
+    throw error
   }
 }
 
