@@ -770,7 +770,7 @@ function App() {
                 })}
               </div>
             </ScrollArea>
-            <div className="border-t pt-3">
+            <div className="border-t pt-3 pb-1">
               <Button
                 className="w-full"
                 variant="outline"
