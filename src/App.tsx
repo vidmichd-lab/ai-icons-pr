@@ -484,6 +484,11 @@ function App() {
     URL.revokeObjectURL(objectUrl)
   }
 
+  const completedCount = (session: HistorySession) =>
+    session.generations.filter(
+      (generation) => generation.status === 'completed' && generation.resultUrl,
+    ).length
+
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-[1480px] flex-col p-4 md:p-6">
       <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_minmax(540px,2fr)]">
@@ -655,40 +660,73 @@ function App() {
                       <CardContent className="space-y-3">
                         <div className="grid grid-cols-3 gap-2 md:grid-cols-4 xl:grid-cols-5">
                           {session.generations.map((generation) => (
-                            <button
+                            <div
                               key={generation.id}
-                              type="button"
                               className={cn(
                                 'rounded-xl border border-border bg-muted/30 p-2 text-left transition hover:bg-muted/60',
                                 generation.id === session.activeGenerationId &&
                                   'border-secondary bg-accent/70 ring-1 ring-secondary/40',
                               )}
-                              onClick={() =>
-                                setHistory((current) =>
-                                  updateSession(current, session.id, (item) => ({
-                                    ...item,
-                                    activeGenerationId: generation.id,
-                                  })),
-                                )
-                              }
                             >
-                              <div className="mb-2 overflow-hidden rounded-lg bg-background">
+                              <div className="relative mb-2 overflow-hidden rounded-lg bg-background">
                                 {generation.resultUrl ? (
-                                  <img
-                                    src={generation.resultUrl}
-                                    alt={generation.label}
-                                    className="aspect-square w-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex aspect-square items-center justify-center text-xs font-semibold text-muted-foreground">
-                                    {shortStatus(generation.status)}
-                                  </div>
-                                )}
+                                  <Button
+                                    size="icon-xs"
+                                    variant="secondary"
+                                    className="absolute top-1 right-1 z-10"
+                                    onClick={() =>
+                                      void downloadPng(
+                                        generation.resultUrl!,
+                                        `${session.sourceName.replace(/\.[^.]+$/, '')}-${generation.label}.png`,
+                                      )
+                                    }
+                                  >
+                                    <DownloadIcon />
+                                    <span className="sr-only">Скачать PNG</span>
+                                  </Button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="block w-full"
+                                  onClick={() =>
+                                    setHistory((current) =>
+                                      updateSession(current, session.id, (item) => ({
+                                        ...item,
+                                        activeGenerationId: generation.id,
+                                      })),
+                                    )
+                                  }
+                                >
+                                  {generation.resultUrl ? (
+                                    <img
+                                      src={generation.resultUrl}
+                                      alt={generation.label}
+                                      className="aspect-square w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex aspect-square items-center justify-center text-xs font-semibold text-muted-foreground">
+                                      {shortStatus(generation.status)}
+                                    </div>
+                                  )}
+                                </button>
                               </div>
-                              <div className="truncate text-[11px] font-medium text-foreground">
-                                {generation.label}
-                              </div>
-                            </button>
+                              <button
+                                type="button"
+                                className="block w-full"
+                                onClick={() =>
+                                  setHistory((current) =>
+                                    updateSession(current, session.id, (item) => ({
+                                      ...item,
+                                      activeGenerationId: generation.id,
+                                    })),
+                                  )
+                                }
+                              >
+                                <div className="truncate text-[11px] font-medium text-foreground">
+                                  {generation.label}
+                                </div>
+                              </button>
+                            </div>
                           ))}
                         </div>
                       </CardContent>
@@ -701,10 +739,12 @@ function App() {
                           <PaintBucketIcon data-icon="inline-start" />
                           Обтравить
                         </Button>
-                        <Button size="sm" onClick={() => void downloadArchive(session)}>
-                          <DownloadIcon data-icon="inline-start" />
-                          Скачать
-                        </Button>
+                        {completedCount(session) > 1 ? (
+                          <Button size="sm" onClick={() => void downloadArchive(session)}>
+                            <DownloadIcon data-icon="inline-start" />
+                            Скачать архив
+                          </Button>
+                        ) : null}
                       </CardFooter>
                     </Card>
                   )
