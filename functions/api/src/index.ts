@@ -318,12 +318,12 @@ const toPublicUser = (user: StoredUser) => ({
 
 const createSessionCookie = (token: string, expiresAt: string) => {
   const env = getEnv()
-  return `${env.AUTH_SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`
+  return `${env.AUTH_SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=None; Expires=${new Date(expiresAt).toUTCString()}`
 }
 
 const clearSessionCookie = () => {
   const env = getEnv()
-  return `${env.AUTH_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  return `${env.AUTH_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=None; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
 }
 
 const getCookieValue = (headers?: Record<string, string | undefined>, cookieName?: string) => {
