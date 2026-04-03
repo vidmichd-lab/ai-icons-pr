@@ -1196,7 +1196,7 @@ function AdminPanel({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="w-[min(96vw,980px)] max-w-[980px] sm:max-w-[980px]">
+      <DialogContent className="grid max-h-[min(88svh,920px)] w-[min(96vw,980px)] max-w-[980px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-[980px]">
         <DialogHeader>
           <DialogTitle>Панель управления</DialogTitle>
           <DialogDescription>
@@ -1204,7 +1204,7 @@ function AdminPanel({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="grid min-h-0 gap-4 overflow-hidden">
           <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-3">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="grid gap-2">
@@ -1265,8 +1265,8 @@ function AdminPanel({
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-border">
-            <ScrollArea className="max-h-[42svh]">
+          <div className="min-h-0 rounded-xl border border-border">
+            <ScrollArea className="h-full max-h-[42svh]">
               <div className="grid gap-2 p-3">
                 {loading ? (
                   <div className="flex min-h-24 items-center justify-center">
