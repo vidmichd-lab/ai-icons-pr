@@ -73,6 +73,7 @@ export type HistorySession = {
   sourceName: string
   sourcePreviewUrl: string
   sourceImageUrl: string
+  sourcePrompt?: string
   styleId: string
   styleName: string
   createdAt: string
