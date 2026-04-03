@@ -159,16 +159,11 @@ const sessionTtlMs = 1000 * 60 * 60 * 24 * 7
 const defaultMonthlyGenerationLimit = 100
 const rootAdminLogin = 'vidmich'
 
-const generationSchema = z
-  .object({
-    imageUrl: z.url().optional(),
-    promptText: z.string().trim().min(1).optional(),
-    styleId: z.string().min(1),
-    seed: z.number().int().nonnegative(),
-  })
-  .refine((payload) => Boolean(payload.imageUrl || payload.promptText), {
-    message: 'imageUrl or promptText is required',
-  })
+const generationSchema = z.object({
+  imageUrl: z.url(),
+  styleId: z.string().min(1),
+  seed: z.number().int().nonnegative(),
+})
 
 const envSchema = z.object({
   KREA_API_TOKEN: z.string().min(1),
@@ -755,14 +750,6 @@ const requestKreaJob = async (path: string, payload: Record<string, unknown>) =>
   }
 }
 
-const buildTextOnlyPrompt = (userPrompt: string, stylePrompt: string) =>
-  [
-    `Create exactly one app-style icon that represents: ${userPrompt}.`,
-    'Centered composition, single object, no text or letters unless explicitly requested.',
-    'Keep it suitable as a product icon and do not place it inside mockups or scenes.',
-    stylePrompt,
-  ].join(' ')
-
 const getJob = async (jobId: string) => {
   const env = getEnv()
 
@@ -1219,14 +1206,6 @@ const appHandler = async (event: HttpEvent) => {
         return response(401, { error: 'Не авторизован' })
       }
 
-      const payload = generationSchema.parse(await request.json())
-      const styles = await readStyles()
-      const style = styles.find((entry) => entry.id === payload.styleId)
-
-      if (!style) {
-        return response(404, { error: 'Style not found' })
-      }
-
       const quotaReservation = await reserveGenerationQuota(currentUser.user)
 
       if (!quotaReservation.ok) {
@@ -1236,20 +1215,20 @@ const appHandler = async (event: HttpEvent) => {
         })
       }
 
-      const job = payload.imageUrl
-        ? await requestKreaJob('/generate/image/bytedance/seededit', {
-            prompt: style.prompt,
-            imageUrl: payload.imageUrl,
-            seed: payload.seed,
-            batchSize: 1,
-          })
-        : await requestKreaJob('/generate/image/bytedance/seedream-4', {
-            prompt: buildTextOnlyPrompt(payload.promptText!, style.prompt),
-            seed: payload.seed,
-            width: 1024,
-            height: 1024,
-            batchSize: 1,
-          })
+      const styles = await readStyles()
+      const payload = generationSchema.parse(await request.json())
+      const style = styles.find((entry) => entry.id === payload.styleId)
+
+      if (!style) {
+        return response(404, { error: 'Style not found' })
+      }
+
+      const job = await requestKreaJob('/generate/image/bytedance/seededit', {
+        prompt: style.prompt,
+        imageUrl: payload.imageUrl,
+        seed: payload.seed,
+        batchSize: 1,
+      })
 
       return response(200, {
         ...job,

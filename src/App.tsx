@@ -92,7 +92,6 @@ function App() {
   const [isLoggingIn, startLogin] = useTransition()
   const [selectedStyleId, setSelectedStyleId] = useState<string>('')
   const [uploads, setUploads] = useState<SourceUpload[]>([])
-  const [promptInput, setPromptInput] = useState('')
   const [history, setHistory] = useState<HistorySession[]>([])
   const [notice, setNotice] = useState<string>('')
   const [isStylesLoading, setIsStylesLoading] = useState(true)
@@ -300,101 +299,14 @@ function App() {
       return
     }
 
-    const trimmedPrompt = promptInput.trim()
-
-    if (uploads.length === 0 && !trimmedPrompt) {
-      setNotice('Добавьте иконку или опишите, что нужно сгенерировать.')
+    if (uploads.length === 0) {
+      setNotice('Добавьте хотя бы одну иконку.')
       return
     }
 
     setNotice('')
 
     startGenerating(async () => {
-      if (uploads.length === 0) {
-        const sessionId = crypto.randomUUID()
-        const generationId = crypto.randomUUID()
-        const seed = newSeed()
-        const sourceName =
-          trimmedPrompt.length > 42 ? `${trimmedPrompt.slice(0, 42).trim()}…` : trimmedPrompt
-
-        setHistory((current) => [
-          {
-            id: sessionId,
-            sourceName,
-            sourcePreviewUrl: '',
-            sourceImageUrl: '',
-            sourcePrompt: trimmedPrompt,
-            styleId: selectedStyle.id,
-            styleName: selectedStyle.name,
-            createdAt: new Date().toISOString(),
-            activeGenerationId: generationId,
-            generations: [
-              {
-                id: generationId,
-                kind: 'styled',
-                label: `Seed ${seed}`,
-                seed,
-                status: 'queued',
-                jobId: '',
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          },
-          ...current,
-        ])
-
-        try {
-          const generation = await api.createGeneration({
-            promptText: trimmedPrompt,
-            styleId: selectedStyle.id,
-            seed,
-          })
-
-          setAuthUser((current) =>
-            current
-              ? {
-                  ...current,
-                  quota: generation.quota,
-                }
-              : current,
-          )
-
-          setHistory((current) =>
-            updateSession(current, sessionId, (session) => ({
-              ...session,
-              generations: session.generations.map((item) =>
-                item.id === generationId
-                  ? {
-                      ...item,
-                      jobId: generation.jobId,
-                      status: generation.status,
-                    }
-                  : item,
-              ),
-            })),
-          )
-
-          void pollJob(sessionId, generationId, generation.jobId)
-          setPromptInput('')
-        } catch (error) {
-          if (error instanceof ApiError && error.status === 429) {
-            await refreshAuthUser()
-          }
-
-          setHistory((current) =>
-            updateSession(current, sessionId, (session) =>
-              patchGeneration(session, generationId, (generation) => ({
-                ...generation,
-                status: 'failed',
-                error: ensureErrorMessage(error),
-              })),
-            ),
-          )
-        }
-
-        return
-      }
-
       for (const upload of uploads) {
         const sessionId = crypto.randomUUID()
         const generationId = crypto.randomUUID()
@@ -541,8 +453,8 @@ function App() {
   }
 
   const reroll = (session: HistorySession) => {
-    if (!session.sourceImageUrl && !session.sourcePrompt) {
-      setNotice('Нет данных для повторной генерации.')
+    if (!session.sourceImageUrl) {
+      setNotice('Исходник для повторной генерации еще не загружен.')
       return
     }
 
@@ -571,10 +483,9 @@ function App() {
     startGenerating(async () => {
       try {
         const response = await api.createGeneration({
+          imageUrl: session.sourceImageUrl,
           styleId: session.styleId,
           seed,
-          ...(session.sourceImageUrl ? { imageUrl: session.sourceImageUrl } : {}),
-          ...(session.sourcePrompt ? { promptText: session.sourcePrompt } : {}),
         })
 
         setAuthUser((current) =>
@@ -979,19 +890,6 @@ function App() {
               </p>
             </div>
 
-            <div className="grid gap-2">
-              <label className="text-sm font-medium text-foreground">Какая иконка нужна</label>
-              <Textarea
-                value={promptInput}
-                onChange={(event) => setPromptInput(event.target.value)}
-                placeholder="Например: иконка о прохождении курса"
-                className="min-h-24 resize-none"
-              />
-              <p className="text-xs text-muted-foreground">
-                Если исходник не загружен, Krea сгенерирует иконку только по описанию и выбранному стилю.
-              </p>
-            </div>
-
             <ScrollArea className="-mx-4 min-h-0 flex-1 px-4">
               <div className="grid gap-2 pb-1">
                 {uploads.map((upload) => (
@@ -1015,7 +913,7 @@ function App() {
           <CardFooter className="mt-auto flex-col gap-2 py-3">
             <Button
               className="w-full"
-              disabled={!isHydrated || isGenerating || (uploads.length === 0 && !promptInput.trim())}
+              disabled={!isHydrated || isGenerating || uploads.length === 0}
               onClick={handleGenerate}
             >
               {isGenerating ? <LoadingSpinner label="Генерация идет…" size="sm" /> : 'Сгенерировать'}
@@ -1081,25 +979,17 @@ function App() {
                     >
                       <CardHeader className="gap-3">
                         <div className="flex items-start gap-3">
-                          {session.sourcePreviewUrl ? (
-                            <img
-                              src={session.sourcePreviewUrl}
-                              alt={session.sourceName}
-                              className="size-24 rounded-lg object-cover"
-                            />
-                          ) : (
-                            <div className="flex size-24 items-center justify-center rounded-lg border border-border bg-muted/40 p-3 text-center text-[11px] font-medium text-muted-foreground">
-                              {session.sourcePrompt ?? 'Текстовый запрос'}
-                            </div>
-                          )}
+                          <img
+                            src={session.sourcePreviewUrl}
+                            alt={session.sourceName}
+                            className="size-24 rounded-lg object-cover"
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-semibold text-foreground">
                               {session.sourceName}
                             </div>
                             <p className="mt-1 text-xs text-muted-foreground">{session.styleName}</p>
-                            <p className="mt-1 text-xs font-medium text-foreground/70">
-                              {session.sourcePreviewUrl ? 'Исходник' : 'Текстовый запрос'}
-                            </p>
+                            <p className="mt-1 text-xs font-medium text-foreground/70">Исходник</p>
                             <p className="mt-2 text-xs text-muted-foreground">
                               {activeGeneration?.error ? (
                                 activeGeneration.error

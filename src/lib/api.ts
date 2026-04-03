@@ -9,10 +9,9 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
 type GenerationRequest = {
+  imageUrl: string
   styleId: string
   seed: number
-  imageUrl?: string
-  promptText?: string
 }
 
 type LoginPayload = {

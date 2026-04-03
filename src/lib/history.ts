@@ -10,14 +10,13 @@ const normalizeSession = (session: HistorySession): HistorySession | null => {
   }
 
   const sourcePreviewUrl =
-    session.sourcePreviewUrl?.startsWith('blob:') && session.sourceImageUrl
+    session.sourcePreviewUrl.startsWith('blob:') && session.sourceImageUrl
       ? session.sourceImageUrl
-      : (session.sourcePreviewUrl ?? '')
+      : session.sourcePreviewUrl
 
   return {
     ...session,
     sourcePreviewUrl,
-    sourcePrompt: session.sourcePrompt?.trim() ? session.sourcePrompt : undefined,
     generations: Array.isArray(session.generations) ? session.generations : [],
   }
 }
