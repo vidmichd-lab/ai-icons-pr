@@ -878,6 +878,12 @@ function App() {
               )}
             >
               <input {...getInputProps()} />
+              <img
+                src="/upload-dropzone-illustration.png"
+                alt=""
+                className="mb-4 h-auto w-full max-w-[280px] object-contain select-none"
+                draggable={false}
+              />
               <div className="text-sm font-semibold text-foreground">Перетащите файлы сюда</div>
               <p className="mt-1 text-xs text-muted-foreground">
                 До 10 файлов, квадратный исходник PNG, JPG, WEBP с иконкой на белом фоне
